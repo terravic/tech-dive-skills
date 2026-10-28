@@ -1,0 +1,117 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.Python
+develop-eggs/
+downloads/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+.installed.cfg
+*.egg
+
+# --- env ---
+.venv/
+venv/
+env/
+ENV/
+.health-venv/
+.python-version
+
+# --- C extensions ---
+*.so
+
+# --- Jupyter / Colab ---
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# --- Node / A2UI tooling ---
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# --- Secrets / Credentials ---
+.env
+.env.*
+!.env.example
+*-service-account*.json
+*credentials*.json
+*.pem
+*.key
+
+# --- Terraform ---
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+
+# --- Data ---
+*.csv
+*.parquet
+*.avro
+
+# --- Logs and scratch output ---
+*.log
+scratch/
+tmp/
+
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# --- Coding Agents ---
+CLAUDE.md
+.claude/
+.agents/skills/
+.agents/roles/
+.refs/
+.adk/
+
+# --- Local / Personal Notes ---
+TODO*.md
+*.local.md
+notes/
+BUILD-NOTES.md
+
+# --- Run ---
+/raw/*
+/findings/
+/gates/*
+/executive/
+!/raw/.gitkeep
+!/gates/.gitkeep
+/program-state/*
+!/program-state/project_parameters.json
+/.local/
+/governance/gates/
+*.sdf
+*.pdb
+*.pdbqt
+*.xpt
+*.h5ad
+*.bam
+*.vcf
+*.vcf.gz
+*.out
+*.log
+dashboards/*.html
+.cache/
+.coverage
+.coverage.*
+htmlcov/
+

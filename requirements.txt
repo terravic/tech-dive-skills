@@ -1,0 +1,4 @@
+# Core mathematical solver (scripts/zhl16c_planner.py), dashboard generator (scripts/build_dashboard.py),
+# and test runner (tests/run_tests.py) use only the Python 3.10+ Standard Library.
+# Optional test runner for pytest compatibility:
+pytest>=7.4.0

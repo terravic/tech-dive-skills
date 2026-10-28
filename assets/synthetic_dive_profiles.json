@@ -1,0 +1,173 @@
+{
+  "metadata": {
+    "dataset_name": "TECHNICAL_DIVE_BENCHMARKS_V2",
+    "description": "Reference technical scuba dive profiles and cylinder configurations.",
+    "schema_version": "2.1"
+  },
+  "profiles": [
+    {
+      "profile_id": "SYNTH-OC-TRIMIX-200FT",
+      "title": "Open Circuit Normoxic/Hypoxic Trimix 200 fsw for 25 min (GF 30/85)",
+      "query_variant": "Variant 1: Depth & Time -> Decompression Schedule",
+      "config": {
+        "dive_mode": "OC",
+        "zhl16c_comp1_variant": "1b",
+        "gf_low": 30,
+        "gf_high": 85,
+        "o2_narcotic": true,
+        "depth_units": "feet",
+        "volume_units": "cuft",
+        "pressure_units": "psi",
+        "setpoint_units": "ATA",
+        "elevation_ft": 0,
+        "water_type": "salt",
+        "stop_size": 10,
+        "last_oc_stop": 10,
+        "last_ccr_stop": 10,
+        "min_stop_time_sec": 60,
+        "descent_rate": 60,
+        "ascent_rate": 30,
+        "deco_ascent_rate": 30,
+        "surface_ascent_rate": 10,
+        "bottom_rmv": 0.75,
+        "deco_rmv": 0.60,
+        "segments": [
+          { "depth": 200, "time_min": 25, "gas_name": "Tx 18/45" }
+        ],
+        "oc_gases": [
+          { "name": "Tx 18/45", "role": "bottom", "f_o2": 0.18, "f_he": 0.45, "max_po2": 1.4, "switch_depth": 220, "cylinder_preset": "2xLP108", "start_pressure_psi": 2640, "enabled": true },
+          { "name": "EAN50", "role": "deco", "f_o2": 0.50, "f_he": 0.00, "max_po2": 1.6, "switch_depth": 70, "cylinder_preset": "AL80", "start_pressure_psi": 3000, "enabled": true },
+          { "name": "O2 100%", "role": "deco", "f_o2": 1.00, "f_he": 0.00, "max_po2": 1.6, "switch_depth": 20, "cylinder_preset": "AL40", "start_pressure_psi": 3000, "enabled": true }
+        ]
+      }
+    },
+    {
+      "profile_id": "SYNTH-CCR-BAILOUT-250FT",
+      "title": "CCR Constant Setpoint 250 fsw for 30 min with Full OC Bailout Schedule",
+      "query_variant": "Variant 3E: CCR + Emergency OC Bailout Plan",
+      "config": {
+        "dive_mode": "CCR",
+        "include_bailout": true,
+        "zhl16c_comp1_variant": "1b",
+        "gf_low": 30,
+        "gf_high": 85,
+        "o2_narcotic": true,
+        "depth_units": "feet",
+        "volume_units": "cuft",
+        "pressure_units": "psi",
+        "setpoint_units": "ATA",
+        "elevation_ft": 0,
+        "water_type": "salt",
+        "stop_size": 10,
+        "last_oc_stop": 10,
+        "last_ccr_stop": 10,
+        "min_stop_time_sec": 60,
+        "descent_rate": 60,
+        "ascent_rate": 30,
+        "deco_ascent_rate": 30,
+        "surface_ascent_rate": 10,
+        "bottom_rmv": 0.75,
+        "deco_rmv": 0.60,
+        "ccr_setpoint_bottom": 1.2,
+        "ccr_setpoint_deco": 1.3,
+        "segments": [
+          { "depth": 250, "time_min": 30 }
+        ],
+        "ccr_diluent": {
+          "name": "Diluent Tx 13/54",
+          "f_o2": 0.13,
+          "f_he": 0.54
+        },
+        "bailout_gases": [
+          { "name": "Bailout Tx 13/54", "f_o2": 0.13, "f_he": 0.54, "max_po2": 1.4, "switch_depth": 250, "cylinder_preset": "AL80", "start_pressure_psi": 3000, "enabled": true },
+          { "name": "Bailout EAN32", "f_o2": 0.32, "f_he": 0.00, "max_po2": 1.6, "switch_depth": 130, "cylinder_preset": "AL80", "start_pressure_psi": 3000, "enabled": true },
+          { "name": "Bailout EAN50", "f_o2": 0.50, "f_he": 0.00, "max_po2": 1.6, "switch_depth": 70, "cylinder_preset": "AL80", "start_pressure_psi": 3000, "enabled": true },
+          { "name": "Bailout O2 100%", "f_o2": 1.00, "f_he": 0.00, "max_po2": 1.6, "switch_depth": 20, "cylinder_preset": "AL40", "start_pressure_psi": 3000, "enabled": true }
+        ]
+      }
+    },
+    {
+      "profile_id": "SYNTH-ALTITUDE-METRIC-40M",
+      "title": "Altitude Metric Dive at 3500 ft Elevation to 40 msw for 20 min on EAN32 + O2",
+      "query_variant": "Altitude & Metric Units Verification",
+      "config": {
+        "dive_mode": "OC",
+        "zhl16c_comp1_variant": "1",
+        "gf_low": 35,
+        "gf_high": 80,
+        "o2_narcotic": false,
+        "depth_units": "meters",
+        "volume_units": "liters",
+        "pressure_units": "bar",
+        "setpoint_units": "BAR",
+        "elevation_ft": 3500,
+        "water_type": "fresh",
+        "stop_size": 3,
+        "last_oc_stop": 3,
+        "last_ccr_stop": 3,
+        "min_stop_time_sec": 30,
+        "descent_rate": 18,
+        "ascent_rate": 9,
+        "deco_ascent_rate": 9,
+        "surface_ascent_rate": 3,
+        "bottom_rmv": 20.0,
+        "deco_rmv": 16.0,
+        "segments": [
+          { "depth": 40, "time_min": 20, "gas_name": "32% Nitrox" }
+        ],
+        "oc_gases": [
+          { "name": "32% Nitrox", "role": "bottom", "f_o2": 0.32, "f_he": 0.00, "max_po2": 1.4, "switch_depth": 40, "cylinder_preset": "D12_232", "start_pressure_psi": 3365, "enabled": true },
+          { "name": "O2 100%", "role": "deco", "f_o2": 1.00, "f_he": 0.00, "max_po2": 1.6, "switch_depth": 6, "cylinder_preset": "7L_232", "start_pressure_psi": 3365, "enabled": true }
+        ]
+      }
+    }
+  ],
+  "tank_envelope_queries": [
+    {
+      "query_id": "SYNTH-TANK-AL80-EAN32",
+      "cylinder_preset": "AL80",
+      "start_pressure_psi": 3000,
+      "f_o2": 0.32,
+      "f_he": 0.0,
+      "max_po2": 1.4,
+      "max_end_ft": 100,
+      "reserve_rule": "thirds"
+    },
+    {
+      "query_id": "SYNTH-TANK-2XLP85-TX1845",
+      "cylinder_preset": "2xLP85",
+      "start_pressure_psi": 2640,
+      "f_o2": 0.18,
+      "f_he": 0.45,
+      "max_po2": 1.4,
+      "max_end_ft": 100,
+      "reserve_rule": "thirds"
+    }
+  ],
+  "blending_queries": [
+    {
+      "blend_id": "SYNTH-BLEND-TX1845-FROM-EMPTY",
+      "mode": "partial_pressure",
+      "start_pressure_psi": 0,
+      "start_f_o2": 0.21,
+      "start_f_he": 0.0,
+      "target_pressure_psi": 3000,
+      "target_f_o2": 0.18,
+      "target_f_he": 0.45,
+      "topup_f_o2": 0.21,
+      "cylinder_preset": "2xLP85"
+    },
+    {
+      "blend_id": "SYNTH-BLEND-RESIDUAL-BLEED",
+      "mode": "partial_pressure",
+      "start_pressure_psi": 1500,
+      "start_f_o2": 0.15,
+      "start_f_he": 0.55,
+      "target_pressure_psi": 2640,
+      "target_f_o2": 0.21,
+      "target_f_he": 0.35,
+      "topup_f_o2": 0.21,
+      "cylinder_preset": "2xLP85"
+    }
+  ]
+}
