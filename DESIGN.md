@@ -13,7 +13,7 @@ This document defines the visual, structural, accessibility, and technical speci
 | **Container Layout** | Responsive 2x2 configuration grid paired with a stacked telemetry output region. | Partition configuration panes (`Dive Profile`, `Gas Mixes`, `Gradient Factors & Algorithm`, `Stops, Rates & RMV`) in `.planner-inputs-grid` above the KPI strip, profile chart, and schedule tables in `.planner-outputs-stack`. |
 | **Status Indicators** | Text-explicit state reporting compliant with WCAG 2.2 AA. | Pair color cues with explicit bracketed text tags (`[NOMINAL]`, `[DECO REQUIRED]`, `[CAUTION >80%]`, `[CRITICAL >100%]`, `[OK]`, `[OVER GF]`) rather than relying on color alone or decorative icons. |
 | **Background Surfaces** | Uncluttered viewport backgrounds across planner and utility workspaces. | Reserve dashed gridlines strictly for the quantitative dual Y-axis dive profile chart (`Depth` and `PO2 (ATA)`). |
-| **Control Surfaces** | Text-first section headers, form labels, and segmented controls. | Use explicit text labels on all interactive controls, including the Light/Dark/System theme selector, OC/CCR toggle, unit toggle, and workspace tabs. |
+| **Control Surfaces** | Clear header grouping with explicit labels and accessible icon-only theme buttons. | Stack the **Profile** selector and profile action buttons (`.navbar-profile-row`) above a dedicated single-line settings row (`.navbar-settings-row`) housing the `OC`/`CCR` toggle, `FT / CUFT` vs. `M / LITERS` toggle, and icon-only Light/Dark/System theme controls. |
 
 ---
 
@@ -30,10 +30,10 @@ This document defines the visual, structural, accessibility, and technical speci
 
 The dashboard natively supports Light Mode, Dark Mode, and System Mode tracking the operating system color-scheme preference.
 
-* **Three-Button Theme Selector:** The theme switcher in the top navigation bar is a segmented control containing three text-labeled buttons:
-  * **Light Mode (`#theme-btn-light`):** Text label `Light` (`title="Light Theme"`, `aria-label="Light Theme"`, `data-theme-mode="light"`).
-  * **Dark Mode (`#theme-btn-dark`):** Text label `Dark` (`title="Dark Theme"`, `aria-label="Dark Theme"`, `data-theme-mode="dark"`).
-  * **System Mode (`#theme-btn-system`):** Text label `System` (`title="System Theme"`, `aria-label="System Theme"`, `data-theme-mode="system"`).
+* **Three-Button Theme Selector:** Placed on the dedicated global settings row (`.navbar-settings-row`) directly underneath the **Profile** selector alongside `OC`/`CCR` and `FT / CUFT` / `M / LITERS`, the theme switcher is a segmented control containing three icon-only inline SVG buttons (`30x30px` circular hit targets, `aria-hidden="true"` on the SVG elements, with explicit `title`, `aria-label`, and `aria-pressed` attributes and no visible text labels):
+  * **Light Mode (`#theme-btn-light`):** Sun SVG icon (`title="Light Theme"`, `aria-label="Light Theme"`, `data-theme-mode="light"`).
+  * **Dark Mode (`#theme-btn-dark`):** Crescent Moon SVG icon (`title="Dark Theme"`, `aria-label="Dark Theme"`, `data-theme-mode="dark"`).
+  * **System Mode (`#theme-btn-system`):** Monitor/Display SVG icon (`title="System Theme"`, `aria-label="System Theme"`, `data-theme-mode="system"`).
   * The active button receives the `active` class and `aria-pressed="true"`, and persists `theme-preference` (`light`, `dark`, or `system`) in `localStorage`.
 * **System Theme Detection:** When `system` mode is active, `window.matchMedia('(prefers-color-scheme: dark)')` resolves the effective theme and listens for `'change'` events to track OS appearance updates in real time.
 * **Surface, Divider, and WCAG 2.2 AA Contrast Tokens:**
@@ -84,7 +84,7 @@ Charts and tissue loading indicators use a consistent semantic color palette pai
 ## 6. Verification Checklist
 
 1. Does `scripts/build_dashboard.py` produce a self-contained offline `dashboard.html` enforcing CSP `default-src 'none'; connect-src 'none'` with zero external network or font calls?
-2. Does the theme selector render the three text-labeled buttons (`#theme-btn-light`, `#theme-btn-dark`, `#theme-btn-system`) with real-time OS `prefers-color-scheme: dark` tracking?
+2. Does the theme selector render the three accessible icon-only inline SVG buttons (`#theme-btn-light`, `#theme-btn-dark`, `#theme-btn-system`) with real-time OS `prefers-color-scheme: dark` tracking?
 3. Do Light Mode and Dark Mode satisfy WCAG 2.2 AA contrast ratios (>= 4.5:1 normal text, >= 3.0:1 UI control borders) across default, hover, and `:focus-visible` states?
 4. Are all dynamic DOM insertions HTML-escaped and imported JSON profiles validated against size, schema, and unsafe object keys?
 5. Are all workspace tabs, tables, form inputs, tissue progress bars, and the SVG profile chart fully keyboard-accessible with explicit textual status indicators?

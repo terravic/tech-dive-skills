@@ -128,17 +128,16 @@
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--border-color);
-      padding: 12px 24px;
+      padding: 10px 24px;
     }
 
     .navbar-inner {
       max-width: 1440px;
       margin: 0 auto;
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      flex-wrap: wrap;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
     }
 
     .brand-group {
@@ -172,6 +171,22 @@
 
     .navbar-controls {
       display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .navbar-profile-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+
+    .navbar-settings-row {
+      display: flex;
       align-items: center;
       gap: 12px;
       flex-wrap: wrap;
@@ -188,13 +203,18 @@
     }
 
     .segmented-pill button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 30px;
       border: none;
       background: transparent;
       color: var(--text-secondary);
       font-family: var(--font-sans);
       font-size: 0.78rem;
       font-weight: 600;
-      padding: 5px 11px;
+      line-height: 1.1;
+      padding: 4px 11px;
       border-radius: 9999px;
       cursor: pointer;
       transition: all 0.15s ease;
@@ -225,14 +245,13 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      padding: 5px 10px;
+      width: 30px;
+      height: 30px;
+      padding: 0;
       border: none;
       border-radius: 9999px;
       background: transparent;
       color: var(--text-secondary);
-      font-family: var(--font-sans);
-      font-size: 0.76rem;
-      font-weight: 600;
       cursor: pointer;
       transition: all 0.15s ease;
     }
@@ -890,7 +909,7 @@
 
       <div class="navbar-controls">
         <!-- Benchmark & Custom Saved Profile Selector + In-Browser Profile Manager -->
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+        <div class="navbar-profile-row">
           <label for="preset-select" style="font-size:0.74rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;">Profile:</label>
           <select id="preset-select" style="width:auto;min-width:220px;padding:5px 9px;font-size:0.8rem;"></select>
           <button type="button" id="btn-new-profile" class="btn btn-sm" title="Create new profile" onclick="createNewBlankProfile()">New</button>
@@ -903,23 +922,32 @@
           <input type="file" id="input-import-file" aria-label="Import dive profiles JSON file" accept=".json" style="display:none;" onchange="importProfilesJson(event)" />
         </div>
 
-        <!-- OC / CCR Mode Toggle -->
-        <div class="segmented-pill" role="group" aria-label="Circuit Mode">
-          <button type="button" id="mode-btn-oc" class="active" aria-pressed="true" onclick="setDiveMode('OC')">OC</button>
-          <button type="button" id="mode-btn-ccr" aria-pressed="false" onclick="setDiveMode('CCR')">CCR</button>
-        </div>
+        <!-- Global Mode, Units, and Theme Settings Row -->
+        <div class="navbar-settings-row">
+          <!-- OC / CCR Mode Toggle -->
+          <div class="segmented-pill" role="group" aria-label="Circuit Mode">
+            <button type="button" id="mode-btn-oc" class="active" aria-pressed="true" onclick="setDiveMode('OC')">OC</button>
+            <button type="button" id="mode-btn-ccr" aria-pressed="false" onclick="setDiveMode('CCR')">CCR</button>
+          </div>
 
-        <!-- Depth Units Toggle -->
-        <div class="segmented-pill" role="group" aria-label="Depth Units">
-          <button type="button" id="unit-btn-feet" class="active" aria-pressed="true" onclick="setDepthUnits('feet')">FT / CUFT</button>
-          <button type="button" id="unit-btn-meters" aria-pressed="false" onclick="setDepthUnits('meters')">M / LITERS</button>
-        </div>
+          <!-- Depth Units Toggle -->
+          <div class="segmented-pill" role="group" aria-label="Depth Units">
+            <button type="button" id="unit-btn-feet" class="active" aria-pressed="true" onclick="setDepthUnits('feet')">FT / CUFT</button>
+            <button type="button" id="unit-btn-meters" aria-pressed="false" onclick="setDepthUnits('meters')">M / LITERS</button>
+          </div>
 
-        <!-- Theme Mode Switcher (Light, Dark, System) -->
-        <div class="theme-switcher" role="group" aria-label="Theme Switcher">
-          <button type="button" id="theme-btn-light" class="theme-btn active" title="Light Theme" aria-label="Light Theme" data-theme-mode="light" aria-pressed="true" onclick="setThemeMode('light')">Light</button>
-          <button type="button" id="theme-btn-dark" class="theme-btn" title="Dark Theme" aria-label="Dark Theme" data-theme-mode="dark" aria-pressed="false" onclick="setThemeMode('dark')">Dark</button>
-          <button type="button" id="theme-btn-system" class="theme-btn" title="System Theme" aria-label="System Theme" data-theme-mode="system" aria-pressed="false" onclick="setThemeMode('system')">System</button>
+          <!-- Theme Mode Switcher (Light, Dark, System) -->
+          <div class="theme-switcher" role="group" aria-label="Theme Switcher">
+            <button type="button" id="theme-btn-light" class="theme-btn active" title="Light Theme" aria-label="Light Theme" data-theme-mode="light" aria-pressed="true" onclick="setThemeMode('light')">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+            </button>
+            <button type="button" id="theme-btn-dark" class="theme-btn" title="Dark Theme" aria-label="Dark Theme" data-theme-mode="dark" aria-pressed="false" onclick="setThemeMode('dark')">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            </button>
+            <button type="button" id="theme-btn-system" class="theme-btn" title="System Theme" aria-label="System Theme" data-theme-mode="system" aria-pressed="false" onclick="setThemeMode('system')">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>

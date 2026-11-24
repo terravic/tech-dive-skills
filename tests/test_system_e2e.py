@@ -253,12 +253,30 @@ class TestSystemEndToEnd(unittest.TestCase):
         # Verify previously removed execution/Apache footer line remains omitted
         self.assertNotIn("Execution: Local offline browser only", html)
 
-        # Verify zero external URLs and zero SVG icons inside theme switcher
+        # Verify zero external URLs, dedicated settings row under Profile, and icon-only SVG theme switcher
         self.assertNotIn("http://", html)
         self.assertNotIn("https://", html)
+        profile_row_start = html.index('class="navbar-profile-row"')
+        settings_row_start = html.index('class="navbar-settings-row"')
+        self.assertGreater(settings_row_start, profile_row_start)
+        profile_row_block = html[profile_row_start:settings_row_start]
+        settings_row_end = html.index("</header>", settings_row_start)
+        settings_row_block = html[settings_row_start:settings_row_end]
+        for action_id in ('id="preset-select"', 'id="btn-new-profile"', 'id="btn-save-profile"', 'id="btn-clear-local-data"'):
+            self.assertIn(action_id, profile_row_block)
+            self.assertNotIn(action_id, settings_row_block)
+        for setting_id in ('id="mode-btn-oc"', 'id="unit-btn-feet"', 'class="theme-switcher"'):
+            self.assertIn(setting_id, settings_row_block)
+            self.assertNotIn(setting_id, profile_row_block)
+
         theme_start = html.index('class="theme-switcher"')
         theme_end = html.index("</div>", theme_start)
-        self.assertNotIn("<svg", html[theme_start:theme_end])
+        theme_block = html[theme_start:theme_end]
+        self.assertEqual(theme_block.count("<svg "), 3)
+        self.assertEqual(theme_block.count('aria-hidden="true"'), 3)
+        self.assertNotIn(">Light<", theme_block)
+        self.assertNotIn(">Dark<", theme_block)
+        self.assertNotIn(">System<", theme_block)
 
         # 3. Verify WCAG 2.2 AA contrast ratios (>= 4.5:1 text, >= 3.0:1 UI control borders)
         def _contrast(h1: str, h2: str) -> float:
