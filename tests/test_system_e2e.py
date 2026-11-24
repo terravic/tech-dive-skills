@@ -329,6 +329,9 @@ class TestSystemEndToEnd(unittest.TestCase):
 
         # 1. Static checks: safe numeric parser, compact layout, live oninput wiring, and removal of falsy-zero fallbacks
         self.assertIn("function readNumericInput(", html)
+        self.assertIn("function setBestMixGasMode(", html)
+        self.assertIn('id="u2-mode-trimix"', html)
+        self.assertIn('id="u2-mode-nitrox"', html)
         self.assertIn('class="blender-mix-row"', html)
         self.assertIn('class="blender-mix-pair"', html)
         self.assertNotIn('Number(document.getElementById("u3-target-fhe").value) || 35', html)
@@ -358,7 +361,21 @@ class TestSystemEndToEnd(unittest.TestCase):
         harness = (
             """
             const vm = require('vm');
+            function makeBtn() {
+              return {
+                attrs: {},
+                classList: { toggle: () => {} },
+                setAttribute(k, v) { this.attrs[k] = v; },
+              };
+            }
             const elements = {
+              'u2-depth': { value: '100' },
+              'u2-po2': { value: '1.40' },
+              'u2-end': { value: '100' },
+              'u2-mode-trimix': makeBtn(),
+              'u2-mode-nitrox': makeBtn(),
+              'u2-end-label-text': { textContent: 'Target Max END' },
+              'u2-results-box': { innerHTML: '' },
               'u3-cylinder': { value: '2xLP85' },
               'u3-start-psi': { value: '500' },
               'u3-target-psi': { value: '2640' },
@@ -397,6 +414,7 @@ class TestSystemEndToEnd(unittest.TestCase):
               Math,
               Number,
               String,
+              Boolean,
               Object,
               Array,
               JSON,
@@ -424,6 +442,19 @@ class TestSystemEndToEnd(unittest.TestCase):
               Object.keys(vals).forEach(k => { elements[k].value = String(vals[k]); });
               ctx.runUtilityBlender();
               return elements['u3-results-box'].innerHTML;
+            }
+
+            function runBestMixCase(depth, allowHe) {
+              elements['u2-depth'].value = String(depth);
+              elements['u2-po2'].value = '1.40';
+              elements['u2-end'].value = '100';
+              ctx.setBestMixGasMode(allowHe);
+              return {
+                html: elements['u2-results-box'].innerHTML,
+                endLabel: elements['u2-end-label-text'].textContent,
+                trimixPressed: elements['u2-mode-trimix'].attrs['aria-pressed'],
+                nitroxPressed: elements['u2-mode-nitrox'].attrs['aria-pressed'],
+              };
             }
 
             const results = {
@@ -455,6 +486,10 @@ class TestSystemEndToEnd(unittest.TestCase):
                 'u3-cylinder': 'AL80', 'u3-start-psi': '0', 'u3-target-psi': '3000',
                 'u3-start-fo2': '21', 'u3-start-fhe': '0', 'u3-target-fo2': '70', 'u3-target-fhe': '40',
               }),
+              bestmix_100_nitrox: runBestMixCase(100, false),
+              bestmix_130_nitrox: runBestMixCase(130, false),
+              bestmix_200_nitrox: runBestMixCase(200, false),
+              bestmix_200_trimix: runBestMixCase(200, true),
             };
             elements['u4-switch-depth'].value = '0';
             ctx.runUtilityDensityAndRockBottom();
@@ -524,6 +559,31 @@ class TestSystemEndToEnd(unittest.TestCase):
         # Case 8: Sibling falsy-zero fix on Utility Tab 4 (u4-switch-depth = 0 -> ascent to 0ft, not 70ft)
         self.assertIn("ascent to 0ft", out["u4_switch_depth_zero"])
         self.assertNotIn("ascent to 70ft", out["u4_switch_depth_zero"])
+
+        # Case 9-12: Best Mix Gas Mode toggle (Nitrox/Air Only vs Trimix) parity with Python engine
+        bm100 = out["bestmix_100_nitrox"]
+        py_bm100 = p.calculate_best_mix_for_depth(100.0, max_po2_ata=1.40, max_end=100.0, allow_helium=False)
+        self.assertEqual(bm100["nitroxPressed"], "true")
+        self.assertEqual(bm100["trimixPressed"], "false")
+        self.assertEqual(bm100["endLabel"], "Max END Alert Threshold")
+        self.assertIn(f"<td><strong>{py_bm100['best_mix_name']}</strong></td>", bm100["html"])
+        self.assertIn("<td>0%</td>", bm100["html"])
+        self.assertIn("[GAS DENSITY CAUTION]", bm100["html"])
+
+        bm130 = out["bestmix_130_nitrox"]
+        py_bm130 = p.calculate_best_mix_for_depth(130.0, max_po2_ata=1.40, max_end=100.0, allow_helium=False)
+        self.assertIn(f"<td><strong>{py_bm130['best_mix_name']}</strong></td>", bm130["html"])
+        self.assertIn("[NARCOSIS WARNING]", bm130["html"])
+        self.assertIn("[CRITICAL GAS DENSITY]", bm130["html"])
+
+        bm200_no_he = out["bestmix_200_nitrox"]
+        self.assertIn("[TRIMIX / SHALLOWER DEPTH REQUIRED]", bm200_no_he["html"])
+
+        bm200_tx = out["bestmix_200_trimix"]
+        py_bm200_tx = p.calculate_best_mix_for_depth(200.0, max_po2_ata=1.40, max_end=100.0, allow_helium=True)
+        self.assertEqual(bm200_tx["trimixPressed"], "true")
+        self.assertEqual(bm200_tx["endLabel"], "Target Max END")
+        self.assertIn(f"<td><strong>{py_bm200_tx['best_mix_name']}</strong></td>", bm200_tx["html"])
 
 
 if __name__ == "__main__":

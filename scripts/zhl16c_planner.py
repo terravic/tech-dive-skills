@@ -604,6 +604,7 @@ def calculate_best_mix_for_depth(
     elevation_ft: float = 0.0,
     depth_units: str = "feet",
     water_type: str = "salt",
+    allow_helium: bool = True,
 ) -> Dict[str, Any]:
     """Tool 2: Computes Best Nitrox, Best Trimix, and closest Standard Agency Mix for depth."""
     depth = _require_finite("depth", depth, "ERR_DEPTH_TIME")
@@ -629,23 +630,27 @@ def calculate_best_mix_for_depth(
     raw_f_o2 = min(1.0, max_po2_ata / p_amb_ata)
     f_o2_best = max(0.05, math.floor(raw_f_o2 * 100.0 + 1e-9) / 100.0)
 
-    # 2. Required Helium fraction for END constraint
-    if o2_narcotic:
-        f_he_narc = max(0.0, 1.0 - ((max_end + d_surf) / (depth + d_surf)))
+    if allow_helium:
+        # 2. Required Helium fraction for END constraint
+        if o2_narcotic:
+            f_he_narc = max(0.0, 1.0 - ((max_end + d_surf) / (depth + d_surf)))
+        else:
+            f_n2_max = min(1.0 - f_o2_best, AIR_F_N2 * ((max_end + d_surf) / (depth + d_surf)))
+            f_he_narc = max(0.0, 1.0 - f_o2_best - f_n2_max)
+
+        # 3. Required Helium fraction for Gas Density <= max_density_g_l
+        target_rho_surf = max_density_g_l / p_amb_ata
+        numer = f_o2_best * (RHO_O2_STP - RHO_N2_STP) + RHO_N2_STP - target_rho_surf
+        denom = RHO_N2_STP - RHO_HE_STP
+        f_he_dens = max(0.0, numer / denom)
+
+        f_he_best = min(
+            round(1.0 - f_o2_best, 2),
+            math.ceil(max(f_he_narc, f_he_dens) * 100.0 - 1e-9) / 100.0,
+        )
     else:
-        f_n2_max = min(1.0 - f_o2_best, AIR_F_N2 * ((max_end + d_surf) / (depth + d_surf)))
-        f_he_narc = max(0.0, 1.0 - f_o2_best - f_n2_max)
+        f_he_best = 0.0
 
-    # 3. Required Helium fraction for Gas Density <= max_density_g_l
-    target_rho_surf = max_density_g_l / p_amb_ata
-    numer = f_o2_best * (RHO_O2_STP - RHO_N2_STP) + RHO_N2_STP - target_rho_surf
-    denom = RHO_N2_STP - RHO_HE_STP
-    f_he_dens = max(0.0, numer / denom)
-
-    f_he_best = min(
-        round(1.0 - f_o2_best, 2),
-        math.ceil(max(f_he_narc, f_he_dens) * 100.0 - 1e-9) / 100.0,
-    )
     f_n2_best = round(max(0.0, 1.0 - f_o2_best - f_he_best), 2)
 
     # Evaluate properties of the computed best mix
@@ -661,10 +666,38 @@ def calculate_best_mix_for_depth(
         water_type=water_type,
     )
 
-    # Find closest standard agency mix that satisfies PO2 <= max_po2_ata + 0.02 and END <= max_end + 10
+    warnings: List[str] = []
+    if not allow_helium:
+        d_unit_short = "ft" if depth_units == "feet" else "m"
+        if f_o2_best < AIR_F_O2:
+            max_air_depth = max(0.0, (max_po2_ata * P0_BAR / AIR_F_O2 - p_surf) / k)
+            warnings.append(
+                f"TRIMIX_REQUIRED_FOR_PO2: {depth:.0f} {d_unit_short} at {max_po2_ata:.2f} ATA requires "
+                f"{f_o2_best*100:.0f}% O2 (< 21% Air). Use Trimix (allow helium) or stay <= "
+                f"{max_air_depth:.1f} {d_unit_short} on Air (21%)."
+            )
+        if best_props["end"] > max_end + 0.5:
+            warnings.append(
+                f"NARCOSIS_WARNING: END ({best_props['end']:.1f} {d_unit_short}) exceeds target max END "
+                f"({max_end:.1f} {d_unit_short}) without helium."
+            )
+        if best_props["density_at_depth_g_l"] > 6.20:
+            warnings.append(
+                f"GAS_DENSITY_CRITICAL: Gas density ({best_props['density_at_depth_g_l']:.2f} g/L) "
+                f"exceeds 6.20 g/L critical threshold without helium."
+            )
+        elif best_props["density_at_depth_g_l"] > max_density_g_l:
+            warnings.append(
+                f"GAS_DENSITY_CAUTION: Gas density ({best_props['density_at_depth_g_l']:.2f} g/L) "
+                f"exceeds {max_density_g_l:.2f} g/L recommended threshold without helium."
+            )
+
+    # Find closest standard agency mix
     recommended_standard = None
     best_score = 1e9
     for candidate in STANDARD_AGENCY_MIXES:
+        if not allow_helium and candidate["f_he"] > 1e-6:
+            continue
         c_props = calculate_ead_end_mod_density(
             depth=depth,
             f_o2=candidate["f_o2"],
@@ -676,7 +709,8 @@ def calculate_best_mix_for_depth(
             depth_units=depth_units,
             water_type=water_type,
         )
-        if c_props["po2_at_depth_ata"] <= max_po2_ata + 0.02 and c_props["end"] <= max_end + (15.0 if depth_units == "feet" else 5.0):
+        end_ok = (not allow_helium) or (c_props["end"] <= max_end + (15.0 if depth_units == "feet" else 5.0))
+        if c_props["po2_at_depth_ata"] <= max_po2_ata + 0.02 and end_ok:
             score = abs(candidate["f_o2"] - f_o2_best) * 2.0 + abs(candidate["f_he"] - f_he_best)
             if score < best_score:
                 best_score = score
@@ -725,6 +759,7 @@ def calculate_best_mix_for_depth(
     return {
         "target_depth": depth,
         "depth_units": depth_units,
+        "allow_helium": allow_helium,
         "best_nitrox_f_o2": f_o2_best if f_he_best == 0.0 else min(0.40, f_o2_best),
         "best_mix_name": format_gas_name(f_o2_best, f_he_best),
         "f_o2": f_o2_best,
@@ -734,6 +769,7 @@ def calculate_best_mix_for_depth(
         "properties_at_depth": {k: v for k, v in best_props.items() if k != "safety_notice"},
         "closest_standard_agency_mix": recommended_standard,
         "recommended_deco_gases": recommended_deco_gases,
+        "warnings": warnings,
         "safety_notice": SAFETY_VERIFICATION_NOTICE,
     }
 
@@ -1736,6 +1772,7 @@ def plan_dive(
     initial_he: Optional[List[float]] = None,
     initial_cns: float = 0.0,
     initial_otu: float = 0.0,
+    allow_helium: bool = True,
 ) -> Dict[str, Any]:
     """Executes Variant 1 / Primary Dive Planning for OC, CCR, and CCR + Bailout."""
     cfg.validate()
@@ -1752,6 +1789,7 @@ def plan_dive(
             elevation_ft=cfg.elevation_ft,
             depth_units=cfg.depth_units,
             water_type=cfg.water_type,
+            allow_helium=allow_helium,
         )
         auto_selected_info = {k: v for k, v in best.items() if k != "safety_notice"}
         bottom_mix = GasMix(
@@ -2755,6 +2793,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_plan.add_argument("--deco-rmv", type=float, default=0.60)
     p_plan.add_argument("--elevation-ft", type=float, default=0.0)
     p_plan.add_argument("--auto-best-gas", action="store_true", help="Variant 1: Automatically compute best bottom and deco gases.")
+    p_plan.add_argument("--no-helium", action="store_true", help="Restrict --auto-best-gas bottom mix selection to Nitrox / Air only (0%% He).")
     p_plan.add_argument("--save-profile-id", type=str, help="Save or update this planned dive configuration under the given profile ID.")
     p_plan.add_argument("--save-profile-title", type=str, help="Optional display title when saving the profile for the UI dropdown selector.")
     p_plan.add_argument("--profiles-file", type=str, help="Optional custom JSON file path for reading/saving profiles (default: assets/synthetic_dive_profiles.json).")
@@ -2826,6 +2865,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_bm.add_argument("--o2-narcotic", choices=["true", "false"], default="true")
     p_bm.add_argument("--elevation-ft", type=float, default=0.0)
     p_bm.add_argument("--depth-units", choices=["feet", "meters"], default="feet")
+    p_bm.add_argument("--no-helium", action="store_true", help="Restrict recommendation to Nitrox / Air only (0%% He).")
 
     # 8. gas-tools
     p_gt = sub.add_parser("gas-tools", help="Tool 1 & Tool 4: Calculate EAD, END, MOD, MinOD, MND, Gas Density, and MDD.")
@@ -2885,6 +2925,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_prof.add_argument("--deco-rmv", type=float, default=0.60)
     p_prof.add_argument("--elevation-ft", type=float, default=0.0)
     p_prof.add_argument("--auto-best-gas", action="store_true", help="Automatically select optimal bottom and deco gases before saving.")
+    p_prof.add_argument("--no-helium", action="store_true", help="Restrict --auto-best-gas bottom mix selection to Nitrox / Air only (0%% He).")
 
     return parser
 
@@ -2970,10 +3011,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     cfg = config_from_dict(raw["config"])
                 else:
                     cfg = config_from_dict(raw)
-                res = plan_dive(cfg, auto_best_gas=args.auto_best_gas)
+                res = plan_dive(cfg, auto_best_gas=args.auto_best_gas, allow_helium=(not args.no_helium))
             else:
                 cfg = _build_dive_config_from_cli_args(args)
-                res = plan_dive(cfg, auto_best_gas=args.auto_best_gas)
+                res = plan_dive(cfg, auto_best_gas=args.auto_best_gas, allow_helium=(not args.no_helium))
 
             if args.save_profile_id:
                 saved_meta = save_profile_to_store(
@@ -3005,7 +3046,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 if not args.profile_id:
                     raise DivePlannerValidationError("ERR_PROFILE_ID", "--profile-id is required for 'profiles --action save'.")
                 cfg = _build_dive_config_from_cli_args(args)
-                res = plan_dive(cfg, auto_best_gas=args.auto_best_gas)
+                res = plan_dive(cfg, auto_best_gas=args.auto_best_gas, allow_helium=(not args.no_helium))
                 out = save_profile_to_store(
                     profile_id=args.profile_id,
                     cfg_dict=res["config"],
@@ -3113,6 +3154,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 o2_narcotic=(args.o2_narcotic == "true"),
                 elevation_ft=args.elevation_ft,
                 depth_units=args.depth_units,
+                allow_helium=(not args.no_helium),
             )
             print(json.dumps(out, indent=2))
             return 0

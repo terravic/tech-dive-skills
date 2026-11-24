@@ -134,7 +134,7 @@ Open `dashboard.html` in any web browser (double-click the file in your file man
 2. **Main Tab 2 (`Diver Tools`)**:
    - Switches to a dedicated full-width calculators screen with four sub-tabs:
      - **`EAD / END / MOD & Max Depth`**: Calculates Maximum Operating Depth (`MOD`), Minimum Operating Depth (`MinOD`), Equivalent Air Depth (`EAD`), Equivalent Narcotic Depth (`END`), Maximum Narcotic Depth (`MND`), and maximum depth supported by your selected cylinder.
-     - **`Best Mix`**: Calculates optimal Nitrox or Trimix fractions for any target depth, $P_{\text{O}_2}$, and `END` limit.
+     - **`Best Mix`**: Calculates optimal Nitrox or Trimix fractions for any target depth, $P_{\text{O}_2}$, and `END` limit, with a **`Trimix (Allow He)`** / **`Nitrox / Air Only (No He)`** mode toggle and physiological alerts when omitting helium exceeds END, density, or Air `MOD` limits.
      - **`Gas Blender`**: Calculates step-by-step partial-pressure gas blending (`Helium`, `Oxygen`, and `Air` top-up) and bleed-down pressures over partially full cylinders.
      - **`Gas Density & Rock Bottom`**: Calculates two-diver emergency reserve gas ("Rock Bottom") to reach the first decompression gas switch and repetitive surface interval `CNS %` decay.
 
@@ -174,6 +174,9 @@ All commands are executed from the project root directory:
 # Variant 1: Given depth and time, compute optimal bottom/deco gases and full decompression plan
 python3 scripts/zhl16c_planner.py plan --depth 200 --time 25 --auto-best-gas
 
+# Variant 1 (Nitrox only, 0% He): Auto-select best Nitrox bottom mix without helium
+python3 scripts/zhl16c_planner.py plan --depth 100 --time 25 --auto-best-gas --no-helium
+
 # Variant 2: Given tank size and gas mix, calculate maximum safe operating depth and NDL/gas envelope
 python3 scripts/zhl16c_planner.py max-depth --cylinder AL80 --fill-psi 3000 --f-o2 0.32 --f-he 0.0
 
@@ -195,8 +198,9 @@ python3 scripts/zhl16c_planner.py bailout-sizing --depth 240 --time 30 --f-o2 0.
 # Tool 1 & Tool 4: Calculate EAD, END, MOD, MinOD, MND, Gas Density (g/L), and MDD
 python3 scripts/zhl16c_planner.py gas-tools --depth 200 --f-o2 0.18 --f-he 0.45 --o2-narcotic true
 
-# Tool 2: Calculate Best Nitrox, Best Trimix, and closest standard agency mix for depth
+# Tool 2: Calculate Best Trimix or Best Nitrox/Air only (--no-helium) for depth
 python3 scripts/zhl16c_planner.py best-mix --depth 200 --max-po2 1.40 --max-end 100 --max-density 5.20
+python3 scripts/zhl16c_planner.py best-mix --depth 100 --max-po2 1.40 --no-helium
 
 # Tool 3: Calculate Trimix/Nitrox partial-pressure cascade blending, bleed-down, and fill capacity
 python3 scripts/zhl16c_planner.py blend --mode partial_pressure --cylinder 2xLP85 --start-pressure 500 --start-f-o2 0.18 --start-f-he 0.45 --target-pressure 2640 --target-f-o2 0.21 --target-f-he 0.35

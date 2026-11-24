@@ -69,6 +69,9 @@ All commands are executed relative to the repository root directory:
 # Plan a 200 ft / 25 min dive and automatically select the best bottom and deco gases
 python3 scripts/zhl16c_planner.py plan --depth 200 --time 25 --auto-best-gas
 
+# Plan a 100 ft / 25 min Nitrox dive without helium (--no-helium)
+python3 scripts/zhl16c_planner.py plan --depth 100 --time 25 --auto-best-gas --no-helium
+
 # Plan a custom OC Trimix 18/45 dive with EAN50 and O2 100% deco gases
 python3 scripts/zhl16c_planner.py plan \
   --mode OC --depth 180 --time 25 --f-o2 0.18 --f-he 0.45 \
@@ -151,9 +154,14 @@ python3 scripts/zhl16c_planner.py gas-tools \
 
 ### 3.9 Tool 2: Best Mix for Depth (`best-mix`)
 ```bash
+# Trimix (allow helium)
 python3 scripts/zhl16c_planner.py best-mix \
   --depth 200 --max-po2 1.40 --max-end 100 --max-density 5.20 \
   --o2-narcotic true --depth-units feet
+
+# Nitrox / Air only (0% He)
+python3 scripts/zhl16c_planner.py best-mix \
+  --depth 100 --max-po2 1.40 --no-helium
 ```
 
 ### 3.10 Tool 3: Nitrox/Trimix Gas Blender, Top-Up & Fill Capacity (`blend`)

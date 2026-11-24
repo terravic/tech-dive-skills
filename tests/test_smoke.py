@@ -50,6 +50,7 @@ class TestCliSmoke(unittest.TestCase):
             ["repetitive", "--d1-depth", "130", "--d1-time", "25", "--surface-interval", "90", "--d2-depth", "100", "--d2-time", "20"],
             ["bailout-sizing", "--depth", "220", "--time", "25", "--f-o2", "0.13", "--f-he", "0.54"],
             ["best-mix", "--depth", "200", "--max-po2", "1.40", "--max-end", "100"],
+            ["best-mix", "--depth", "100", "--max-po2", "1.40", "--no-helium"],
             ["gas-tools", "--depth", "160", "--f-o2", "0.21", "--f-he", "0.35"],
             ["blend", "--mode", "partial_pressure", "--start-pressure", "500", "--start-f-o2", "0.18", "--start-f-he", "0.45", "--target-pressure", "2640", "--target-f-o2", "0.21", "--target-f-he", "0.35"],
             ["blend", "--mode", "topup_result", "--start-pressure", "1000", "--start-f-o2", "0.32", "--target-pressure", "3000", "--topup-f-o2", "0.21"],
@@ -64,6 +65,20 @@ class TestCliSmoke(unittest.TestCase):
                 if cmd[0] != "profiles":
                     self.assertIn("safety_notice", parsed, msg=f"Missing safety_notice in {cmd[0]} output")
                     self.assertIn("SAFETY & VERIFICATION NOTICE", parsed["safety_notice"])
+
+        # Verify --no-helium restricts both best-mix and plan --auto-best-gas to 0% He
+        bm_no_he = self._run_cli(["best-mix", "--depth", "100", "--max-po2", "1.40", "--no-helium"])
+        self.assertEqual(bm_no_he.returncode, 0, msg=bm_no_he.stderr)
+        bm_data = json.loads(bm_no_he.stdout)
+        self.assertFalse(bm_data["allow_helium"])
+        self.assertEqual(bm_data["best_mix_name"], "EAN34")
+        self.assertEqual(bm_data["f_he"], 0.0)
+
+        plan_no_he = self._run_cli(["--json", "plan", "--depth", "100", "--time", "25", "--auto-best-gas", "--no-helium"])
+        self.assertEqual(plan_no_he.returncode, 0, msg=plan_no_he.stderr)
+        plan_data = json.loads(plan_no_he.stdout)
+        self.assertEqual(plan_data["auto_selected_best_gas"]["best_mix_name"], "EAN34")
+        self.assertEqual(plan_data["auto_selected_best_gas"]["f_he"], 0.0)
 
     def test_profile_save_recall_and_delete_lifecycle(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

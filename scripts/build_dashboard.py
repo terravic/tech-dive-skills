@@ -1369,6 +1369,13 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
 
           <!-- Utility Tab 2: Best Mix for Depth -->
           <div id="util-tab-bestmix" class="tab-panel" role="tabpanel" aria-labelledby="util-tab-btn-bestmix">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+              <span class="blender-pct-label">Gas Mode:</span>
+              <div class="segmented-pill" role="group" aria-label="Best Mix Gas Mode">
+                <button type="button" id="u2-mode-trimix" class="active" aria-pressed="true" onclick="setBestMixGasMode(true)">Trimix (Allow He)</button>
+                <button type="button" id="u2-mode-nitrox" aria-pressed="false" onclick="setBestMixGasMode(false)">Nitrox / Air Only (No He)</button>
+              </div>
+            </div>
             <div class="form-grid-3">
               <div class="field-group">
                 <label for="u2-depth">Target Depth (<span class="unit-depth-lbl">ft</span>)</label>
@@ -1379,7 +1386,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
                 <input type="number" id="u2-po2" value="1.40" min="1.0" max="1.6" step="0.05" oninput="runUtilityBestMix()" onchange="runUtilityBestMix()" />
               </div>
               <div class="field-group">
-                <label for="u2-end">Target Max END (<span class="unit-depth-lbl">ft</span>)</label>
+                <label for="u2-end"><span id="u2-end-label-text">Target Max END</span> (<span class="unit-depth-lbl">ft</span>)</label>
                 <input type="number" id="u2-end" value="100" min="30" max="150" step="5" oninput="runUtilityBestMix()" onchange="runUtilityBestMix()" />
               </div>
             </div>
@@ -1539,6 +1546,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       scheduleView: "primary",
       depthUnits: "feet",
       volumeUnits: "cuft",
+      bestMixAllowHe: true,
       gases: [
         { name: "Tx 18/45", f_o2: 0.18, f_he: 0.45, role: "bottom", max_po2: 1.40, switch_depth: 180, cylinder_preset: "2xLP85", start_pressure_psi: 2640, enabled: true },
         { name: "EAN50", f_o2: 0.50, f_he: 0.00, role: "deco", max_po2: 1.60, switch_depth: 70, cylinder_preset: "AL80", start_pressure_psi: 3000, enabled: true },
@@ -2704,9 +2712,29 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       `;
     }
 
+    function setBestMixGasMode(allowHe) {
+      appState.bestMixAllowHe = Boolean(allowHe);
+      const btnTrimix = document.getElementById("u2-mode-trimix");
+      const btnNitrox = document.getElementById("u2-mode-nitrox");
+      const endLbl = document.getElementById("u2-end-label-text");
+      if (btnTrimix) {
+        btnTrimix.classList.toggle("active", appState.bestMixAllowHe);
+        btnTrimix.setAttribute("aria-pressed", appState.bestMixAllowHe ? "true" : "false");
+      }
+      if (btnNitrox) {
+        btnNitrox.classList.toggle("active", !appState.bestMixAllowHe);
+        btnNitrox.setAttribute("aria-pressed", !appState.bestMixAllowHe ? "true" : "false");
+      }
+      if (endLbl) {
+        endLbl.textContent = appState.bestMixAllowHe ? "Target Max END" : "Max END Alert Threshold";
+      }
+      runUtilityBestMix();
+    }
+
     function runUtilityBestMix() {
       const cfg = readCurrentConfig();
       const dUnit = cfg.depthUnits === "feet" ? "ft" : "m";
+      const allowHe = appState.bestMixAllowHe !== false;
       const depth = Math.max(1, readNumericInput("u2-depth", 200));
       const maxPo2 = Math.max(0.2, readNumericInput("u2-po2", 1.40));
       const maxEnd = Math.max(10, readNumericInput("u2-end", 100));
@@ -2717,24 +2745,55 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       const pAmbAta = (pSurf + depth * kBar) / P0_BAR;
 
       const fO2Best = Math.max(0.05, Math.floor(Math.min(1.0, maxPo2 / pAmbAta) * 100.0 + 1e-9) / 100.0);
-      const fHeNarc = cfg.o2Narcotic
-        ? Math.max(0.0, 1.0 - ((maxEnd + dSurf) / (depth + dSurf)))
-        : Math.max(0.0, 1.0 - fO2Best - Math.min(1.0 - fO2Best, AIR_F_N2 * ((maxEnd + dSurf) / (depth + dSurf))));
-      const targetRhoSurf = 5.20 / pAmbAta;
-      const fHeDens = Math.max(0.0, (fO2Best * (RHO_O2_STP - RHO_N2_STP) + RHO_N2_STP - targetRhoSurf) / (RHO_N2_STP - RHO_HE_STP));
-      const fHeBest = Math.min(Number((1.0 - fO2Best).toFixed(2)), Math.ceil(Math.max(fHeNarc, fHeDens) * 100.0 - 1e-9) / 100.0);
+      let fHeBest = 0.0;
+      if (allowHe) {
+        const fHeNarc = cfg.o2Narcotic
+          ? Math.max(0.0, 1.0 - ((maxEnd + dSurf) / (depth + dSurf)))
+          : Math.max(0.0, 1.0 - fO2Best - Math.min(1.0 - fO2Best, AIR_F_N2 * ((maxEnd + dSurf) / (depth + dSurf))));
+        const targetRhoSurf = 5.20 / pAmbAta;
+        const fHeDens = Math.max(0.0, (fO2Best * (RHO_O2_STP - RHO_N2_STP) + RHO_N2_STP - targetRhoSurf) / (RHO_N2_STP - RHO_HE_STP));
+        fHeBest = Math.min(Number((1.0 - fO2Best).toFixed(2)), Math.ceil(Math.max(fHeNarc, fHeDens) * 100.0 - 1e-9) / 100.0);
+      }
       const fN2Best = Math.max(0, 1.0 - fO2Best - fHeBest);
       const props = calcGasProps(depth, fO2Best, fHeBest, cfg.o2Narcotic, cfg.elevationFt, cfg.depthUnits, "OC", 1.2, maxPo2, maxEnd);
+
+      const alerts = [];
+      if (!allowHe) {
+        if (fO2Best < AIR_F_O2) {
+          const maxAirDepth = Math.max(0.0, (maxPo2 * P0_BAR / AIR_F_O2 - pSurf) / kBar);
+          alerts.push(
+            `[TRIMIX / SHALLOWER DEPTH REQUIRED] ${depth.toFixed(0)} ${dUnit} at ${maxPo2.toFixed(2)} ATA requires ${Math.round(fO2Best * 100)}% O2 (< 21% Air). Switch to Trimix (Allow He) or stay <= ${maxAirDepth.toFixed(1)} ${dUnit} on Air (21%).`
+          );
+        }
+        if (props.end > maxEnd + 0.5) {
+          alerts.push(
+            `[NARCOSIS WARNING] END (${props.end.toFixed(1)} ${dUnit}) exceeds your ${maxEnd.toFixed(1)} ${dUnit} alert threshold without helium.`
+          );
+        }
+        if (props.rhoDepth > 6.20) {
+          alerts.push(
+            `[CRITICAL GAS DENSITY] Breathing gas density (${props.rhoDepth.toFixed(2)} g/L) exceeds the 6.20 g/L critical threshold without helium.`
+          );
+        } else if (props.rhoDepth > 5.20) {
+          alerts.push(
+            `[GAS DENSITY CAUTION] Breathing gas density (${props.rhoDepth.toFixed(2)} g/L) exceeds the 5.20 g/L recommended threshold without helium.`
+          );
+        }
+      }
+      const alertsHtml = alerts.length
+        ? `<div class="alert-list" style="margin-top:10px;margin-bottom:0;">${alerts.map(a => `<div class="alert-item" role="alert">${escapeHtml(a)}</div>`).join("")}</div>`
+        : "";
 
       document.getElementById("u2-results-box").innerHTML = `
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th scope="col">Recommended Ideal Mix</th>
+                <th scope="col">${allowHe ? "Recommended Ideal Mix" : "Best Nitrox / Air (No He)"}</th>
                 <th scope="col">O2 %</th>
                 <th scope="col">He %</th>
                 <th scope="col">N2 %</th>
+                <th scope="col">MOD (${maxPo2.toFixed(2)} ATA)</th>
                 <th scope="col">PO2 @ ${depth}${escapeHtml(dUnit)}</th>
                 <th scope="col">END @ ${depth}${escapeHtml(dUnit)}</th>
                 <th scope="col">Density @ ${depth}${escapeHtml(dUnit)}</th>
@@ -2747,6 +2806,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
                 <td>${Math.round(fO2Best * 100)}%</td>
                 <td>${Math.round(fHeBest * 100)}%</td>
                 <td>${Math.round(fN2Best * 100)}%</td>
+                <td>${props.modWork.toFixed(1)} ${escapeHtml(dUnit)}</td>
                 <td>${props.po2Ata.toFixed(2)} ATA</td>
                 <td>${props.end.toFixed(1)} ${escapeHtml(dUnit)}</td>
                 <td>${props.rhoDepth.toFixed(2)} g/L</td>
@@ -2755,6 +2815,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
             </tbody>
           </table>
         </div>
+        ${alertsHtml}
       `;
     }
 

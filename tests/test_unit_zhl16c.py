@@ -206,6 +206,39 @@ class TestZhl16cMathematics(unittest.TestCase):
             p.solve_rock_bottom(depth=180.0, bottom_time_min=25.0, ascent_rate=0.0)
         self.assertEqual(ctx_rb.exception.code, "ERR_KINEMATIC_RATE")
 
+    def test_best_mix_no_helium_mode(self) -> None:
+        # 100 fsw at 1.40 ATA: with allow_helium=True density forces 2% He (Tx 34/2); allow_helium=False -> EAN34
+        bm_trimix = p.calculate_best_mix_for_depth(100.0, max_po2_ata=1.40, max_end=100.0, allow_helium=True)
+        self.assertGreater(bm_trimix["f_he"], 0.0)
+        self.assertTrue(bm_trimix["allow_helium"])
+
+        bm_nitrox_100 = p.calculate_best_mix_for_depth(100.0, max_po2_ata=1.40, max_end=100.0, allow_helium=False)
+        self.assertFalse(bm_nitrox_100["allow_helium"])
+        self.assertEqual(bm_nitrox_100["best_mix_name"], "EAN34")
+        self.assertEqual(bm_nitrox_100["f_o2"], 0.34)
+        self.assertEqual(bm_nitrox_100["f_he"], 0.0)
+        self.assertEqual(bm_nitrox_100["closest_standard_agency_mix"]["f_he"], 0.0)
+        self.assertTrue(any("GAS_DENSITY_CAUTION" in w for w in bm_nitrox_100["warnings"]))
+
+        # 130 fsw without helium -> EAN28 with narcosis and critical density warnings
+        bm_nitrox_130 = p.calculate_best_mix_for_depth(130.0, max_po2_ata=1.40, max_end=100.0, allow_helium=False)
+        self.assertEqual(bm_nitrox_130["best_mix_name"], "EAN28")
+        self.assertEqual(bm_nitrox_130["f_he"], 0.0)
+        self.assertTrue(any("NARCOSIS_WARNING" in w for w in bm_nitrox_130["warnings"]))
+        self.assertTrue(any("GAS_DENSITY_CRITICAL" in w for w in bm_nitrox_130["warnings"]))
+
+        # 200 fsw without helium -> flags TRIMIX_REQUIRED_FOR_PO2 (< 21% O2)
+        bm_nitrox_200 = p.calculate_best_mix_for_depth(200.0, max_po2_ata=1.40, max_end=100.0, allow_helium=False)
+        self.assertEqual(bm_nitrox_200["f_he"], 0.0)
+        self.assertTrue(any("TRIMIX_REQUIRED_FOR_PO2" in w for w in bm_nitrox_200["warnings"]))
+
+        # plan_dive with auto_best_gas=True and allow_helium=False selects EAN34 (0% He)
+        cfg = p.DiveConfig(segments=[{"depth": 100.0, "time_min": 25.0}])
+        res = p.plan_dive(cfg, auto_best_gas=True, allow_helium=False)
+        self.assertEqual(res["auto_selected_best_gas"]["best_mix_name"], "EAN34")
+        self.assertEqual(res["auto_selected_best_gas"]["f_he"], 0.0)
+        self.assertEqual(res["config"]["oc_gases"][0]["f_he"], 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()
