@@ -122,7 +122,7 @@ python3 scripts/zhl16c_planner.py max-time \
 ```bash
 python3 scripts/zhl16c_planner.py rock-bottom \
   --depth 180 --time 25 --cylinder 2xLP85 --fill-psi 2640 \
-  --switch-depth 70 --stressed-rmv 1.00
+  --switch-depth 70 --stressed-rmv 1.00 --divers 2 --problem-time 1.0 --ascent-rate 30
 ```
 
 ### 3.5 Variant 3C: What-If GF & Lost Decompression Gas Comparison (`what-if`)
@@ -133,9 +133,14 @@ python3 scripts/zhl16c_planner.py what-if \
 
 ### 3.6 Variant 3D: Repetitive Dive & Surface Interval Off-Gassing (`repetitive`)
 ```bash
+# Full repetitive Dive 1 -> Surface Interval -> Dive 2 schedule
 python3 scripts/zhl16c_planner.py repetitive \
   --d1-depth 130 --d1-time 25 --surface-interval 90 \
   --d2-depth 100 --d2-time 25 --f-o2 0.32
+
+# Standalone NOAA 90-minute half-time CNS % surface interval decay
+python3 scripts/zhl16c_planner.py repetitive \
+  --start-cns 50 --surface-interval 90
 ```
 
 ### 3.7 Variant 3E: CCR Loop Failure Bailout Stage Sizing (`bailout-sizing`)

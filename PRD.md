@@ -300,11 +300,12 @@ $$GF\left(D_{\text{next}}\right) = GF_{\text{low}} + \left(GF_{\text{high}} - GF
   - **Main Tab 1 (`Dive Planner` / `#main-view-planner`, active by default)**:
     - **Top 2x2 Configuration Grid (`.planner-inputs-grid`)**: `Dive Profile` (profile naming, `New`, `Save`, target depth/time, `Auto Best Gas`, `Calculate Plan`), `Gas Mixes` (interactive cylinder/mix table), `Gradient Factors & Algorithm` (GF presets, `GF Low`/`GF High`, Compartment `1b`/`1`, `O2 Narcosis`, CCR setpoints), and `Stops, Rates & RMV` (stop step, last OC/CCR stop, stop quantum, RMV, kinematic rates, site elevation).
     - **Bottom Output Stack (`.planner-outputs-stack`)**: 4-Card KPI Summary Strip (`Total Runtime (TTS)`, `Max Depth & Leading Tissue`, `Oxygen Toxicity (CNS / OTU)`, `Peak Gas Density & END`), `Depth & Decompression Ceiling` dual Y-axis SVG chart with mouse hover and keyboard scrubbing (`#chart-hover-tooltip`), and tabbed outputs (`Decompression Schedule`, `Cylinder Gas`, `Tissue Compartments` with `role="progressbar"` loading indicators).
-  - **Main Tab 2 (`Diver Tools` / `#main-view-tools`)**: Displays the full-width Diver Utility Calculators card with four WAI-ARIA tabs:
-    1. `EAD / END / MOD & Max Depth` (`#util-tab-mod`)
+  - **Main Tab 2 (`Diver Tools` / `#main-view-tools`)**: Displays the full-width Diver Utility Calculators card with five WAI-ARIA tabs:
+    1. `EAD / END / MOD & Gas Density` (`#util-tab-mod`, showing `Density @ Depth` and `MDD 5.2 / 6.2 g/L`)
     2. `Best Mix` (`#util-tab-bestmix`, with `Trimix (Allow He)` vs. `Nitrox / Air Only (No He)` mode selector)
-    3. `Gas Blender` (`#util-tab-blender`)
-    4. `Gas Density & Rock Bottom` (`#util-tab-density`)
+    3. `Gas Blender` (`#util-tab-blender`, with compact Residual/Desired gas inputs and live partial-pressure calculation)
+    4. `Rock Bottom & Reserves` (`#util-tab-density`, independent emergency gas-sharing reserve calculator showing Rule of Thirds and Effective Turn Pressure with `Sync from Dive Plan`)
+    5. `Repetitive / Surface Interval` (`#util-tab-surface-interval`, NOAA 90-minute half-time CNS % decay calculator with `Sync from Dive Plan`)
 - **Profile Persistence, Printing, & Erasure Controls**: Top navigation bar supports `New`, `Save`, `Delete`, `Export` (machine-readable JSON including top-level `safety_notice` metadata), `Import` (1 MB size-capped, schema-validated, prototype-pollution-safe JSON), `Print Plan` (`#btn-print-plan`, triggering browser `@media print` output with a dedicated 6-clause mandatory verification, dive-professional confirmation, and assumption-of-risk notice plus printable pre-dive verification checklist), and `Clear Local Data` (`clearAllLocalData()`).
 
 ---

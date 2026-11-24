@@ -132,11 +132,12 @@ Open `dashboard.html` in any web browser (double-click the file in your file man
    - **Configure Dive Parameters**: Enter target depth and bottom time in **Dive Profile** (or click **`Auto Best Gas`**), edit cylinders and mixes in **Gas Mixes**, adjust **`GF Low`** / **`GF High`** and Compartment `1b`/`1` in **Gradient Factors & Algorithm**, and tune stops, ascent/descent rates, RMV, and altitude in **Stops, Rates & RMV**.
    - **Review Ascent & Telemetry**: Inspect the 4 KPI summary cards, the interactive **Depth & Decompression Ceiling** SVG chart (hover with mouse or focus and use `Left`/`Right` arrow keys), and the **Decompression Schedule**, **Cylinder Gas**, and **Tissue Compartments** tabs.
 2. **Main Tab 2 (`Diver Tools`)**:
-   - Switches to a dedicated full-width calculators screen with four sub-tabs:
-     - **`EAD / END / MOD & Max Depth`**: Calculates Maximum Operating Depth (`MOD`), Minimum Operating Depth (`MinOD`), Equivalent Air Depth (`EAD`), Equivalent Narcotic Depth (`END`), Maximum Narcotic Depth (`MND`), and maximum depth supported by your selected cylinder.
+   - Switches to a dedicated full-width calculators screen with five sub-tabs:
+     - **`EAD / END / MOD & Gas Density`**: Calculates Maximum Operating Depth (`MOD`), Minimum Operating Depth (`MinOD`), Equivalent Air Depth (`EAD`), Equivalent Narcotic Depth (`END`), Maximum Narcotic Depth (`MND`), Breathing Gas Density at depth ($\text{g/L}$ with `5.2` / `6.2 g/L` thresholds and `MDD`), and maximum depth supported by your selected cylinder.
      - **`Best Mix`**: Calculates optimal Nitrox or Trimix fractions for any target depth, $P_{\text{O}_2}$, and `END` limit, with a **`Trimix (Allow He)`** / **`Nitrox / Air Only (No He)`** mode toggle and physiological alerts when omitting helium exceeds END, density, or Air `MOD` limits.
      - **`Gas Blender`**: Calculates step-by-step partial-pressure gas blending (`Helium`, `Oxygen`, and `Air` top-up) and bleed-down pressures over partially full cylinders.
-     - **`Gas Density & Rock Bottom`**: Calculates two-diver emergency reserve gas ("Rock Bottom") to reach the first decompression gas switch and repetitive surface interval `CNS %` decay.
+     - **`Rock Bottom & Reserves`**: Calculates emergency gas-sharing reserve ("Rock Bottom"), Rule of Thirds turn pressure, and **Effective Turn Pressure** (flagging whenever Rock Bottom exceeds 1/3 of starting fill), with independent depth/cylinder/fill/switch/RMV/divers/problem-time/ascent-rate inputs and a one-click **`Sync from Dive Plan`** button.
+     - **`Repetitive / Surface Interval`**: Calculates NOAA 90-minute half-time `CNS %` off-gassing and remaining Dive 2 CNS margin (`80%` / `100%`) with independent inputs and **`Sync from Dive Plan`**.
 
 ---
 
@@ -183,14 +184,15 @@ python3 scripts/zhl16c_planner.py max-depth --cylinder AL80 --fill-psi 3000 --f-
 # Variant 3A: Solve for NDL, tank-limited bottom time, and CNS limit at a target depth
 python3 scripts/zhl16c_planner.py max-time --depth 100 --f-o2 0.32 --cylinder AL80 --fill-psi 3000
 
-# Variant 3B: Calculate Minimum Gas ('Rock Bottom') and Turn Pressure for two divers sharing gas
-python3 scripts/zhl16c_planner.py rock-bottom --depth 180 --time 25 --cylinder 2xLP85 --fill-psi 2640 --switch-depth 70
+# Variant 3B: Calculate Minimum Gas ('Rock Bottom'), Rule of Thirds, and Effective Turn Pressure
+python3 scripts/zhl16c_planner.py rock-bottom --depth 180 --time 25 --cylinder 2xLP85 --fill-psi 2640 --switch-depth 70 --stressed-rmv 1.00 --divers 2 --problem-time 1.0 --ascent-rate 30
 
 # Variant 3C: Compare Gradient Factor pairs and Lost Decompression Gas scenarios
 python3 scripts/zhl16c_planner.py what-if --depth 180 --time 25 --f-o2 0.18 --f-he 0.45
 
-# Variant 3D: Chain Dive 1 -> Surface Interval -> Dive 2
+# Variant 3D: Chain Dive 1 -> Surface Interval -> Dive 2 (or standalone CNS % decay via --start-cns)
 python3 scripts/zhl16c_planner.py repetitive --d1-depth 130 --d1-time 25 --surface-interval 90 --d2-depth 100 --d2-time 25 --f-o2 0.32
+python3 scripts/zhl16c_planner.py repetitive --start-cns 50 --surface-interval 90
 
 # Variant 3E: Calculate CCR loop failure OC bailout schedule and stage cylinder recommendations
 python3 scripts/zhl16c_planner.py bailout-sizing --depth 240 --time 30 --f-o2 0.13 --f-he 0.54

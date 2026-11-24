@@ -239,6 +239,35 @@ class TestZhl16cMathematics(unittest.TestCase):
         self.assertEqual(res["auto_selected_best_gas"]["f_he"], 0.0)
         self.assertEqual(res["config"]["oc_gases"][0]["f_he"], 0.0)
 
+    def test_rock_bottom_effective_turn_pressure_rules(self) -> None:
+        # 1. Rule of Thirds governs when rock bottom < 1/3 of starting fill (2xLP85 @ 2640 psi, 180 ft -> 70 ft switch)
+        rb_thirds = p.solve_rock_bottom(
+            depth=180.0, bottom_time_min=25.0, cylinder_preset="2xLP85",
+            fill_pressure_psi=2640.0, first_switch_depth=70.0, stressed_rmv_per_diver=1.00,
+        )
+        self.assertEqual(rb_thirds["turn_governing_rule"], "RULE_OF_THIRDS")
+        self.assertEqual(rb_thirds["effective_turn_pressure_psi"], rb_thirds["rule_of_thirds_turn_pressure_psi"])
+        self.assertEqual(rb_thirds["warnings"], [])
+
+        # 2. Rock Bottom governs when reserve > 1/3 of starting fill (AL80 @ 3000 psi, 130 ft -> 0 ft surface)
+        rb_gov = p.solve_rock_bottom(
+            depth=130.0, bottom_time_min=20.0, cylinder_preset="AL80",
+            fill_pressure_psi=3000.0, first_switch_depth=0.0, stressed_rmv_per_diver=1.00,
+            num_divers_sharing=2, problem_solving_time_min=1.0, ascent_rate=30.0,
+        )
+        self.assertEqual(rb_gov["turn_governing_rule"], "ROCK_BOTTOM")
+        self.assertGreater(rb_gov["effective_turn_pressure_psi"], rb_gov["rule_of_thirds_turn_pressure_psi"])
+        self.assertTrue(any("ROCK_BOTTOM_EXCEEDS_THIRDS" in w for w in rb_gov["warnings"]))
+
+        # 3. Insufficient cylinder capacity when rock bottom >= starting fill (AL80 @ 3000 psi, 220 ft -> 0 ft)
+        rb_insuff = p.solve_rock_bottom(
+            depth=220.0, bottom_time_min=20.0, cylinder_preset="AL80",
+            fill_pressure_psi=3000.0, first_switch_depth=0.0, stressed_rmv_per_diver=1.00,
+        )
+        self.assertEqual(rb_insuff["turn_governing_rule"], "INSUFFICIENT_CYLINDER")
+        self.assertEqual(rb_insuff["usable_before_turn_psi"], 0.0)
+        self.assertTrue(any("INSUFFICIENT_CYLINDER_CAPACITY" in w for w in rb_insuff["warnings"]))
+
 
 if __name__ == "__main__":
     unittest.main()

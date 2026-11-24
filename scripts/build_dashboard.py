@@ -477,6 +477,40 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       margin-bottom: 12px;
     }
 
+    .form-grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    @media (max-width: 960px) {
+      .form-grid-4 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 560px) {
+      .form-grid-4 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .tool-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .tool-helper-text {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin: 0;
+    }
+
     .blender-mix-row {
       display: flex;
       flex-wrap: wrap;
@@ -1319,10 +1353,11 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
         <!-- Card R3: Diver Tools -->
         <div class="card">
           <div class="tab-bar" role="tablist" aria-label="Diver Utility Calculators" onkeydown="handleTablistKeydown(event)">
-            <button type="button" id="util-tab-btn-mod" class="tab-btn active" role="tab" aria-selected="true" aria-controls="util-tab-mod" tabindex="0" onclick="switchUtilityTab('util-tab-mod', this)">EAD / END / MOD &amp; Max Depth</button>
+            <button type="button" id="util-tab-btn-mod" class="tab-btn active" role="tab" aria-selected="true" aria-controls="util-tab-mod" tabindex="0" onclick="switchUtilityTab('util-tab-mod', this)">EAD / END / MOD &amp; Gas Density</button>
             <button type="button" id="util-tab-btn-bestmix" class="tab-btn" role="tab" aria-selected="false" aria-controls="util-tab-bestmix" tabindex="-1" onclick="switchUtilityTab('util-tab-bestmix', this)">Best Mix</button>
             <button type="button" id="util-tab-btn-blender" class="tab-btn" role="tab" aria-selected="false" aria-controls="util-tab-blender" tabindex="-1" onclick="switchUtilityTab('util-tab-blender', this)">Gas Blender</button>
-            <button type="button" id="util-tab-btn-density" class="tab-btn" role="tab" aria-selected="false" aria-controls="util-tab-density" tabindex="-1" onclick="switchUtilityTab('util-tab-density', this)">Gas Density &amp; Rock Bottom</button>
+            <button type="button" id="util-tab-btn-density" class="tab-btn" role="tab" aria-selected="false" aria-controls="util-tab-density" tabindex="-1" onclick="switchUtilityTab('util-tab-density', this)">Rock Bottom &amp; Reserves</button>
+            <button type="button" id="util-tab-btn-si" class="tab-btn" role="tab" aria-selected="false" aria-controls="util-tab-surface-interval" tabindex="-1" onclick="switchUtilityTab('util-tab-surface-interval', this)">Repetitive / Surface Interval</button>
           </div>
 
           <!-- Utility Tab 1: EAD / END / MOD & Max Depth -->
@@ -1446,23 +1481,78 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
             <div id="u3-results-box" aria-live="polite" style="margin-top:12px;"></div>
           </div>
 
-          <!-- Utility Tab 4: Gas Density, Rock Bottom & What-If GF Comparison -->
+          <!-- Utility Tab 4: Rock Bottom & Gas Reserves -->
           <div id="util-tab-density" class="tab-panel" role="tabpanel" aria-labelledby="util-tab-btn-density">
-            <div class="form-grid-3">
+            <div class="tool-header-row">
+              <p class="tool-helper-text">Calculates emergency gas-sharing reserve ("Rock Bottom"), Rule of Thirds turn pressure, and Effective Turn Pressure to reach your 1st deco switch or surface.</p>
+              <button type="button" id="btn-u4-sync-plan" class="btn btn-sm" onclick="syncRockBottomFromPlan()">Sync from Dive Plan</button>
+            </div>
+            <div class="form-grid-4">
               <div class="field-group">
-                <label for="u4-switch-depth">1st Deco Switch Depth (<span class="unit-depth-lbl">ft</span>)</label>
-                <input type="number" id="u4-switch-depth" value="70" min="0" max="200" step="10" oninput="runUtilityDensityAndRockBottom()" onchange="runUtilityDensityAndRockBottom()" />
+                <label for="u4-depth">Max Depth (<span class="unit-depth-lbl">ft</span>)</label>
+                <input type="number" id="u4-depth" value="180" min="10" max="600" step="5" oninput="runUtilityDensityAndRockBottom()" onchange="runUtilityDensityAndRockBottom()" />
               </div>
               <div class="field-group">
-                <label for="u4-stressed-rmv">Stressed RMV per Diver</label>
+                <label for="u4-cylinder">Cylinder</label>
+                <select id="u4-cylinder" class="mono-select" onchange="onRockBottomCylinderChange()">
+                  <option value="2xLP85" selected>2xLP85 Doubles (170 cuft @ 2640 psi)</option>
+                  <option value="2xLP108">2xLP108 Doubles (216 cuft @ 2640 psi)</option>
+                  <option value="2xHP100">2xHP100 Doubles (200 cuft @ 3442 psi)</option>
+                  <option value="2xAL80">2xAL80 Doubles (154.8 cuft @ 3000 psi)</option>
+                  <option value="AL80">AL80 (77.4 cuft @ 3000 psi)</option>
+                  <option value="LP85">LP85 (85.0 cuft @ 2640 psi)</option>
+                  <option value="HP100">HP100 (100.0 cuft @ 3442 psi)</option>
+                  <option value="12L_232">12L Euro (232 bar)</option>
+                  <option value="D12_232">D12 Euro Doubles (24L @ 232 bar)</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label for="u4-fill-pressure">Starting Fill (<span class="unit-pressure-lbl">psi</span>)</label>
+                <input type="number" id="u4-fill-pressure" value="2640" min="100" max="4500" step="50" oninput="runUtilityDensityAndRockBottom()" onchange="runUtilityDensityAndRockBottom()" />
+              </div>
+              <div class="field-group">
+                <label for="u4-switch-depth">1st Deco Switch (<span class="unit-depth-lbl">ft</span>, 0=Surf)</label>
+                <input type="number" id="u4-switch-depth" value="70" min="0" max="400" step="10" oninput="runUtilityDensityAndRockBottom()" onchange="runUtilityDensityAndRockBottom()" />
+              </div>
+            </div>
+            <div class="form-grid-4">
+              <div class="field-group">
+                <label for="u4-stressed-rmv">Stressed RMV / Diver (<span class="unit-rmv-lbl">cuft/min</span>)</label>
                 <input type="number" id="u4-stressed-rmv" value="1.00" min="0.2" max="60" step="0.1" oninput="runUtilityDensityAndRockBottom()" onchange="runUtilityDensityAndRockBottom()" />
               </div>
               <div class="field-group">
-                <label for="u4-si-min">Repetitive Surface Interval (m)</label>
-                <input type="number" id="u4-si-min" value="90" min="10" max="720" step="10" oninput="runUtilityDensityAndRockBottom()" onchange="runUtilityDensityAndRockBottom()" />
+                <label for="u4-divers">Divers Sharing Gas</label>
+                <input type="number" id="u4-divers" value="2" min="1" max="4" step="1" oninput="runUtilityDensityAndRockBottom()" onchange="runUtilityDensityAndRockBottom()" />
+              </div>
+              <div class="field-group">
+                <label for="u4-problem-min">Bottom Problem Time (min)</label>
+                <input type="number" id="u4-problem-min" value="1.0" min="0" max="10" step="0.5" oninput="runUtilityDensityAndRockBottom()" onchange="runUtilityDensityAndRockBottom()" />
+              </div>
+              <div class="field-group">
+                <label for="u4-ascent-rate">Emergency Ascent Rate (<span class="unit-rate-lbl">fpm</span>)</label>
+                <input type="number" id="u4-ascent-rate" value="30" min="3" max="60" step="5" oninput="runUtilityDensityAndRockBottom()" onchange="runUtilityDensityAndRockBottom()" />
               </div>
             </div>
             <div id="u4-results-box" aria-live="polite" style="margin-top:12px;"></div>
+          </div>
+
+          <!-- Utility Tab 5: Repetitive / Surface Interval CNS % Decay -->
+          <div id="util-tab-surface-interval" class="tab-panel" role="tabpanel" aria-labelledby="util-tab-btn-si">
+            <div class="tool-header-row">
+              <p class="tool-helper-text">Calculates NOAA 90-minute half-time Central Nervous System (CNS %) oxygen toxicity decay during a surface interval between repetitive dives.</p>
+              <button type="button" id="btn-u5-sync-plan" class="btn btn-sm" onclick="syncSurfaceIntervalFromPlan()">Sync from Dive Plan</button>
+            </div>
+            <div class="form-grid-2" style="max-width:520px;">
+              <div class="field-group">
+                <label for="u5-start-cns">Ending CNS % (Dive 1)</label>
+                <input type="number" id="u5-start-cns" value="45.0" min="0" max="200" step="1" oninput="runUtilitySurfaceInterval()" onchange="runUtilitySurfaceInterval()" />
+              </div>
+              <div class="field-group">
+                <label for="u4-si-min">Surface Interval (min)</label>
+                <input type="number" id="u4-si-min" value="90" min="0" max="720" step="10" oninput="runUtilitySurfaceInterval()" onchange="runUtilitySurfaceInterval()" />
+              </div>
+            </div>
+            <div id="u5-results-box" aria-live="polite" style="margin-top:12px;"></div>
           </div>
 
         </div>
@@ -2221,6 +2311,9 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       btnMeters.classList.toggle("active", units === "meters");
       btnMeters.setAttribute("aria-pressed", units === "meters" ? "true" : "false");
       document.querySelectorAll(".unit-depth-lbl").forEach(el => { el.textContent = toMeters ? "m" : "ft"; });
+      document.querySelectorAll(".unit-rmv-lbl").forEach(el => { el.textContent = toMeters ? "L/min" : "cuft/min"; });
+      document.querySelectorAll(".unit-rate-lbl").forEach(el => { el.textContent = toMeters ? "m/min" : "fpm"; });
+      document.querySelectorAll(".unit-pressure-lbl").forEach(el => { el.textContent = toMeters ? "bar" : "psi"; });
 
       document.getElementById("input-depth").value = Math.round(Number(document.getElementById("input-depth").value) * factor);
       document.getElementById("input-stop-size").value = toMeters ? 3 : 10;
@@ -2232,6 +2325,22 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       document.getElementById("input-rate-surf").value = toMeters ? 3 : 10;
       document.getElementById("input-rmv-bottom").value = toMeters ? 20.0 : 0.75;
       document.getElementById("input-rmv-deco").value = toMeters ? 16.0 : 0.60;
+
+      const u4DepthEl = document.getElementById("u4-depth");
+      const u4SwEl = document.getElementById("u4-switch-depth");
+      const u4FillEl = document.getElementById("u4-fill-pressure");
+      const u4RmvEl = document.getElementById("u4-stressed-rmv");
+      const u4AscEl = document.getElementById("u4-ascent-rate");
+      if (u4DepthEl) u4DepthEl.value = Math.round(readNumericInput("u4-depth", 180) * factor);
+      if (u4SwEl) u4SwEl.value = Math.round(readNumericInput("u4-switch-depth", 70) * factor);
+      if (u4FillEl) {
+        const curFill = readNumericInput("u4-fill-pressure", toMeters ? 2640 : 182);
+        u4FillEl.value = toMeters
+          ? Math.round(curFill * (P0_BAR / P0_PSI))
+          : Math.round(curFill * (P0_PSI / P0_BAR));
+      }
+      if (u4RmvEl) u4RmvEl.value = toMeters ? 28.0 : 1.00;
+      if (u4AscEl) u4AscEl.value = toMeters ? 9 : 30;
 
       appState.gases.forEach(g => {
         if (g.switch_depth) g.switch_depth = Math.round(g.switch_depth * factor);
@@ -2677,6 +2786,9 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       }
 
       const maxSafeD = Math.min(props.modWork, props.mnd, props.mdd52, tankMaxD || props.modWork);
+      const densStatus = props.rhoDepth > 6.20
+        ? "[CRITICAL > 6.2]"
+        : (props.rhoDepth > 5.20 ? "[CAUTION > 5.2]" : "[NOMINAL]");
 
       resultsBox.innerHTML = `
         <div class="table-wrap">
@@ -2690,7 +2802,8 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
                 <th scope="col">EAD @ ${depth}${escapeHtml(dUnit)}</th>
                 <th scope="col">END @ ${depth}${escapeHtml(dUnit)}</th>
                 <th scope="col">MND Limit</th>
-                <th scope="col">MDD (5.2 g/L)</th>
+                <th scope="col">Density @ ${depth}${escapeHtml(dUnit)}</th>
+                <th scope="col">MDD (5.2 / 6.2 g/L)</th>
                 <th scope="col">Max Safe Depth (${escapeHtml(cylKey)})</th>
               </tr>
             </thead>
@@ -2703,7 +2816,8 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
                 <td>${props.ead.toFixed(1)} ${escapeHtml(dUnit)}</td>
                 <td>${props.end.toFixed(1)} ${escapeHtml(dUnit)}</td>
                 <td>${props.mnd.toFixed(1)} ${escapeHtml(dUnit)}</td>
-                <td>${props.mdd52.toFixed(1)} ${escapeHtml(dUnit)}</td>
+                <td><strong>${props.rhoDepth.toFixed(2)} g/L</strong> ${densStatus}</td>
+                <td>${props.mdd52.toFixed(1)} / ${props.mdd62.toFixed(1)} ${escapeHtml(dUnit)}</td>
                 <td><strong>${maxSafeD.toFixed(1)} ${escapeHtml(dUnit)}</strong></td>
               </tr>
             </tbody>
@@ -2909,53 +3023,180 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       `;
     }
 
+    function onRockBottomCylinderChange() {
+      const cylEl = document.getElementById("u4-cylinder");
+      const fillEl = document.getElementById("u4-fill-pressure");
+      if (cylEl && fillEl) {
+        const spec = BENCHMARK_DATA.standard_cylinders[cylEl.value];
+        if (spec) {
+          fillEl.value = appState.depthUnits === "meters" ? Math.round(spec.rated_bar) : Math.round(spec.rated_psi);
+        }
+      }
+      runUtilityDensityAndRockBottom();
+    }
+
+    function syncRockBottomFromPlan() {
+      const cfg = readCurrentConfig();
+      const isMetric = cfg.depthUnits === "meters";
+      const bGas = cfg.gases[0] || { cylinder_preset: "2xLP85", start_pressure_psi: 2640 };
+      const spec = BENCHMARK_DATA.standard_cylinders[bGas.cylinder_preset] || BENCHMARK_DATA.standard_cylinders["2xLP85"];
+      const firstDeco = cfg.gases
+        .filter(g => g.enabled && (g.role === "deco" || g.role === "bailout") && g.switch_depth !== null && g.switch_depth !== undefined && g.switch_depth < cfg.depth)
+        .sort((a, b) => Number(b.switch_depth) - Number(a.switch_depth))[0];
+
+      const depthEl = document.getElementById("u4-depth");
+      const cylEl = document.getElementById("u4-cylinder");
+      const fillEl = document.getElementById("u4-fill-pressure");
+      const swEl = document.getElementById("u4-switch-depth");
+      const ascEl = document.getElementById("u4-ascent-rate");
+
+      if (depthEl) depthEl.value = Math.round(cfg.depth);
+      if (cylEl && Array.from(cylEl.options).some(o => o.value === bGas.cylinder_preset)) {
+        cylEl.value = bGas.cylinder_preset;
+      }
+      if (fillEl) {
+        const startPsi = Number(bGas.start_pressure_psi) || spec.rated_psi;
+        fillEl.value = isMetric ? Math.round(startPsi * (P0_BAR / P0_PSI)) : Math.round(startPsi);
+      }
+      if (swEl) swEl.value = firstDeco ? Math.round(Number(firstDeco.switch_depth)) : 0;
+      if (ascEl) ascEl.value = Math.round(cfg.ascentRate);
+      runUtilityDensityAndRockBottom();
+    }
+
     function runUtilityDensityAndRockBottom() {
       const cfg = readCurrentConfig();
-      const dUnit = cfg.depthUnits === "feet" ? "ft" : "m";
+      const isMetric = cfg.depthUnits === "meters";
+      const dUnit = isMetric ? "m" : "ft";
       const vUnit = cfg.volumeUnits;
+      const pUnit = isMetric ? "bar" : "psi";
+      const roundStep = isMetric ? 5.0 : 50.0;
+
+      const depth = Math.max(1, readNumericInput("u4-depth", cfg.depth));
+      const cylEl = document.getElementById("u4-cylinder");
+      const bGas = cfg.gases[0] || { cylinder_preset: "2xLP85", start_pressure_psi: 2640 };
+      const cylKey = (cylEl && cylEl.value) || bGas.cylinder_preset || "2xLP85";
+      const spec = BENCHMARK_DATA.standard_cylinders[cylKey] || BENCHMARK_DATA.standard_cylinders["2xLP85"];
+      const defaultFill = isMetric ? spec.rated_bar : spec.rated_psi;
+
+      const fillPressure = Math.max(10, readNumericInput("u4-fill-pressure", defaultFill));
       const swDepth = Math.max(0, readNumericInput("u4-switch-depth", 70));
-      const stressedRmv = Math.max(0.1, readNumericInput("u4-stressed-rmv", 1.00));
-      const siMin = Math.max(0, readNumericInput("u4-si-min", 90));
+      const stressedRmv = Math.max(0.1, readNumericInput("u4-stressed-rmv", isMetric ? 28.0 : 1.00));
+      const numDivers = Math.max(1, Math.round(readNumericInput("u4-divers", 2)));
+      const problemMin = Math.max(0, readNumericInput("u4-problem-min", 1.0));
+      const ascentRate = Math.max(1, readNumericInput("u4-ascent-rate", cfg.ascentRate));
 
       const pSurf = getSurfacePressureBar(cfg.elevationFt);
       const kBar = getHydroGradientBar(cfg.depthUnits);
-      const pBottom = pSurf + cfg.depth * kBar;
-      const targetSw = Math.min(cfg.depth, Math.max(0, swDepth));
+      const pBottom = pSurf + depth * kBar;
+      const targetSw = Math.min(depth, Math.max(0, swDepth));
       const pSwitch = pSurf + targetSw * kBar;
 
-      const teamRmv = stressedRmv * 2.0;
-      const volProb = teamRmv * (pBottom / P0_BAR) * 1.0;
-      const ascTime = Math.abs(cfg.depth - targetSw) / cfg.ascentRate;
+      const teamRmv = stressedRmv * numDivers;
+      const volProb = teamRmv * (pBottom / P0_BAR) * problemMin;
+      const ascTime = Math.abs(depth - targetSw) / ascentRate;
       const volAsc = teamRmv * ((0.5 * (pBottom + pSwitch)) / P0_BAR) * ascTime;
       const rockBottomVol = volProb + volAsc;
 
-      const bGas = cfg.gases[0] || { cylinder_preset: "2xLP85", start_pressure_psi: 2640 };
-      const spec = BENCHMARK_DATA.standard_cylinders[bGas.cylinder_preset] || BENCHMARK_DATA.standard_cylinders["2xLP85"];
-      const totalVol = cfg.volumeUnits === "cuft" ? spec.rated_cuft : spec.water_liters * spec.rated_bar;
-      const rbPsi = Math.ceil(((rockBottomVol / totalVol) * spec.rated_psi) / 50.0) * 50;
+      const pressurePerVol = isMetric
+        ? (P0_BAR / Math.max(1e-6, spec.water_liters))
+        : (spec.rated_psi / Math.max(1e-6, spec.rated_cuft));
+      const rockBottomP = Math.ceil((rockBottomVol * pressurePerVol) / roundStep) * roundStep;
+      const thirdsTurnP = Math.ceil((fillPressure * (2.0 / 3.0)) / roundStep) * roundStep;
+      const rbTurnP = Math.min(
+        fillPressure,
+        Math.ceil(((fillPressure + rockBottomP) * 0.5) / roundStep) * roundStep
+      );
 
-      const curCns = appState.lastPlanResult ? appState.lastPlanResult.summary.final_cns_pct : 25.0;
-      const cnsAfterSi = curCns * Math.exp(-(LN2 / 90.0) * siMin);
+      let effectiveTurnP = thirdsTurnP;
+      let govTag = "[RULE OF THIRDS]";
+      const alerts = [];
+      if (rockBottomP >= fillPressure) {
+        effectiveTurnP = fillPressure;
+        govTag = "[INSUFFICIENT TANK]";
+        alerts.push(
+          `[INSUFFICIENT CYLINDER CAPACITY] Rock bottom reserve (${rockBottomP.toFixed(0)} ${pUnit}) meets or exceeds starting fill (${fillPressure.toFixed(0)} ${pUnit}). Use a larger cylinder, shallower depth, or higher 1st deco switch depth.`
+        );
+      } else if (rbTurnP > thirdsTurnP) {
+        effectiveTurnP = rbTurnP;
+        govTag = "[ROCK BOTTOM GOVERNS]";
+        alerts.push(
+          `[ROCK BOTTOM EXCEEDS THIRDS] Minimum reserve (${rockBottomP.toFixed(0)} ${pUnit}) exceeds one-third of starting fill (${(fillPressure / 3.0).toFixed(0)} ${pUnit}). Effective Turn Pressure raised from ${thirdsTurnP.toFixed(0)} ${pUnit} (Rule of Thirds) to ${effectiveTurnP.toFixed(0)} ${pUnit}.`
+        );
+      }
+
+      const usableBeforeTurnP = Math.max(0, fillPressure - effectiveTurnP);
+      const usableBeforeTurnVol = usableBeforeTurnP / Math.max(1e-6, pressurePerVol);
+      const alertsHtml = alerts.length
+        ? `<div class="alert-list" style="margin-top:10px;margin-bottom:0;">${alerts.map(a => `<div class="alert-item" role="alert">${escapeHtml(a)}</div>`).join("")}</div>`
+        : "";
 
       document.getElementById("u4-results-box").innerHTML = `
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th scope="col">Rock Bottom Volume (2 Divers)</th>
-                <th scope="col">Minimum Reserve Pressure (${escapeHtml(bGas.cylinder_preset)})</th>
-                <th scope="col">Rule of Thirds Turn Pressure</th>
-                <th scope="col">CNS % Before SI</th>
-                <th scope="col">CNS % After ${siMin}m Surface Interval</th>
+                <th scope="col">Rock Bottom Volume (${numDivers} ${numDivers === 1 ? "Diver" : "Divers"})</th>
+                <th scope="col">Minimum Reserve (${escapeHtml(cylKey)})</th>
+                <th scope="col">Rule of Thirds Turn</th>
+                <th scope="col">Effective Turn Pressure</th>
+                <th scope="col">Usable Gas Before Turn</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td><strong>${rockBottomVol.toFixed(1)} ${escapeHtml(vUnit)}</strong> (1m solve + ascent to ${targetSw}${escapeHtml(dUnit)})</td>
-                <td><strong>${rbPsi} psi</strong></td>
-                <td>${Math.round(spec.rated_psi * 2 / 3)} psi</td>
-                <td>${curCns.toFixed(1)}%</td>
-                <td><strong>${cnsAfterSi.toFixed(1)}%</strong> (90m half-time decay)</td>
+                <td><strong>${rockBottomVol.toFixed(1)} ${escapeHtml(vUnit)}</strong> (${problemMin.toFixed(1)}m solve + ascent to ${targetSw}${escapeHtml(dUnit)})</td>
+                <td><strong>${rockBottomP.toFixed(0)} ${escapeHtml(pUnit)}</strong> (of ${fillPressure.toFixed(0)} ${escapeHtml(pUnit)})</td>
+                <td>${thirdsTurnP.toFixed(0)} ${escapeHtml(pUnit)}</td>
+                <td><strong>${effectiveTurnP.toFixed(0)} ${escapeHtml(pUnit)}</strong> ${govTag}</td>
+                <td>${usableBeforeTurnP.toFixed(0)} ${escapeHtml(pUnit)} (${usableBeforeTurnVol.toFixed(1)} ${escapeHtml(vUnit)})</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        ${alertsHtml}
+      `;
+    }
+
+    function syncSurfaceIntervalFromPlan() {
+      const cnsEl = document.getElementById("u5-start-cns");
+      const curCns = appState.lastPlanResult ? appState.lastPlanResult.summary.final_cns_pct : 45.0;
+      if (cnsEl) cnsEl.value = curCns.toFixed(1);
+      runUtilitySurfaceInterval();
+    }
+
+    function runUtilitySurfaceInterval() {
+      const resultsBox = document.getElementById("u5-results-box");
+      if (!resultsBox) return;
+      const fallbackCns = appState.lastPlanResult ? appState.lastPlanResult.summary.final_cns_pct : 45.0;
+      const startCns = Math.max(0, readNumericInput("u5-start-cns", fallbackCns));
+      const siMin = Math.max(0, readNumericInput("u4-si-min", 90));
+      const halfTimes = siMin / 90.0;
+      const cnsAfterSi = startCns * Math.exp(-(LN2 / 90.0) * siMin);
+      const recoveredCns = Math.max(0, startCns - cnsAfterSi);
+      const margin80 = Math.max(0, 80.0 - cnsAfterSi);
+      const margin100 = Math.max(0, 100.0 - cnsAfterSi);
+
+      resultsBox.innerHTML = `
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">CNS % Before SI</th>
+                <th scope="col">Surface Interval</th>
+                <th scope="col">90m Half-Times Elapsed</th>
+                <th scope="col">CNS % After SI</th>
+                <th scope="col">CNS % Recovered</th>
+                <th scope="col">Dive 2 Margin (to 80% / 100%)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>${startCns.toFixed(1)}%</td>
+                <td>${siMin.toFixed(0)} min</td>
+                <td>${halfTimes.toFixed(2)}x</td>
+                <td><strong>${cnsAfterSi.toFixed(1)}%</strong></td>
+                <td>-${recoveredCns.toFixed(1)}%</td>
+                <td>${margin80.toFixed(1)}% / ${margin100.toFixed(1)}%</td>
               </tr>
             </tbody>
           </table>
@@ -2968,6 +3209,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       runUtilityBestMix();
       runUtilityBlender();
       runUtilityDensityAndRockBottom();
+      runUtilitySurfaceInterval();
     }
 
     function handleTablistKeydown(evt) {
@@ -3054,8 +3296,9 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
     }
 
     function switchUtilityTab(tabId, btnEl) {
-      ["util-tab-mod", "util-tab-bestmix", "util-tab-blender", "util-tab-density"].forEach(id => {
-        document.getElementById(id).classList.toggle("active", id === tabId);
+      ["util-tab-mod", "util-tab-bestmix", "util-tab-blender", "util-tab-density", "util-tab-surface-interval"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle("active", id === tabId);
       });
       btnEl.parentElement.querySelectorAll(".tab-btn").forEach(b => {
         const isActive = (b === btnEl);

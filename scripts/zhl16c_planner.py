@@ -2202,7 +2202,35 @@ def solve_rock_bottom(
     psi_per_unit = fill_pressure_psi / max(1e-6, total_vol)
     rock_bottom_psi = math.ceil((rock_bottom_vol * psi_per_unit) / 50.0) * 50.0
     thirds_turn_psi = math.ceil((fill_pressure_psi * (2.0 / 3.0)) / 50.0) * 50.0
+    rock_bottom_turn_psi = min(
+        fill_pressure_psi,
+        math.ceil(((fill_pressure_psi + rock_bottom_psi) * 0.5) / 50.0) * 50.0,
+    )
+    if rock_bottom_psi >= fill_pressure_psi:
+        effective_turn_psi = fill_pressure_psi
+        turn_governing_rule = "INSUFFICIENT_CYLINDER"
+    elif rock_bottom_turn_psi > thirds_turn_psi:
+        effective_turn_psi = rock_bottom_turn_psi
+        turn_governing_rule = "ROCK_BOTTOM"
+    else:
+        effective_turn_psi = thirds_turn_psi
+        turn_governing_rule = "RULE_OF_THIRDS"
+    usable_before_turn_psi = max(0.0, fill_pressure_psi - effective_turn_psi)
 
+    warnings: List[str] = []
+    if turn_governing_rule == "INSUFFICIENT_CYLINDER":
+        warnings.append(
+            f"INSUFFICIENT_CYLINDER_CAPACITY: Rock bottom reserve ({rock_bottom_psi:.0f} psi) meets or exceeds "
+            f"starting cylinder fill ({fill_pressure_psi:.0f} psi). Use a larger cylinder, shallower depth, or higher switch depth."
+        )
+    elif turn_governing_rule == "ROCK_BOTTOM":
+        warnings.append(
+            f"ROCK_BOTTOM_EXCEEDS_THIRDS: Rock bottom reserve ({rock_bottom_psi:.0f} psi) exceeds one-third of starting fill "
+            f"({fill_pressure_psi / 3.0:.0f} psi). Effective turn pressure raised from {thirds_turn_psi:.0f} psi (Rule of Thirds) "
+            f"to {effective_turn_psi:.0f} psi."
+        )
+
+    psi_to_bar = P0_BAR / P0_PSI
     return {
         "depth": depth,
         "bottom_time_min": bottom_time_min,
@@ -2210,14 +2238,25 @@ def solve_rock_bottom(
         "cylinder_preset": cylinder_preset,
         "fill_pressure_psi": fill_pressure_psi,
         "first_gas_switch_depth": target_switch,
+        "num_divers_sharing": num_divers_sharing,
+        "problem_solving_time_min": problem_solving_time_min,
+        "ascent_rate": ascent_rate,
         "team_stressed_rmv": round(team_rmv, 2),
         "problem_resolution_volume": round(vol_problem, 1),
         "emergency_ascent_volume": round(vol_ascent, 1),
         "rock_bottom_volume": round(rock_bottom_vol, 1),
         "volume_units": volume_units,
         "rock_bottom_pressure_psi": round(rock_bottom_psi, 0),
-        "rock_bottom_pressure_bar": round(rock_bottom_psi / P0_PSI * P0_BAR, 0),
+        "rock_bottom_pressure_bar": round(rock_bottom_psi * psi_to_bar, 0),
         "rule_of_thirds_turn_pressure_psi": round(thirds_turn_psi, 0),
+        "rule_of_thirds_turn_pressure_bar": round(thirds_turn_psi * psi_to_bar, 0),
+        "rock_bottom_turn_pressure_psi": round(rock_bottom_turn_psi, 0),
+        "rock_bottom_turn_pressure_bar": round(rock_bottom_turn_psi * psi_to_bar, 0),
+        "effective_turn_pressure_psi": round(effective_turn_psi, 0),
+        "effective_turn_pressure_bar": round(effective_turn_psi * psi_to_bar, 0),
+        "turn_governing_rule": turn_governing_rule,
+        "usable_before_turn_psi": round(usable_before_turn_psi, 0),
+        "warnings": warnings,
         "safety_notice": SAFETY_VERIFICATION_NOTICE,
     }
 
@@ -2827,6 +2866,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_rb.add_argument("--fill-psi", type=float, default=2640.0)
     p_rb.add_argument("--switch-depth", type=float, default=70.0)
     p_rb.add_argument("--stressed-rmv", type=float, default=1.00)
+    p_rb.add_argument("--divers", type=int, default=2, help="Number of divers sharing gas during emergency ascent (default: 2).")
+    p_rb.add_argument("--problem-time", type=float, default=1.0, help="Minutes at max depth to resolve failure before ascending (default: 1.0).")
+    p_rb.add_argument("--ascent-rate", type=float, default=30.0, help="Emergency ascent rate in fpm or m/min (default: 30.0).")
+    p_rb.add_argument("--depth-units", choices=["feet", "meters"], default="feet")
+    p_rb.add_argument("--volume-units", choices=["cuft", "liters"], default="cuft")
+    p_rb.add_argument("--elevation-ft", type=float, default=0.0)
 
     # 5. what-if
     p_wi = sub.add_parser("what-if", help="Variant 3C: Compare GF pairs and lost-deco-gas scenarios.")
@@ -2836,13 +2881,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_wi.add_argument("--f-he", type=float, default=0.45)
 
     # 6. repetitive
-    p_rep = sub.add_parser("repetitive", help="Variant 3D: Chain Dive 1 -> Surface Interval -> Dive 2.")
+    p_rep = sub.add_parser("repetitive", help="Variant 3D: Chain Dive 1 -> Surface Interval -> Dive 2, or compute standalone CNS % surface interval decay.")
     p_rep.add_argument("--d1-depth", type=float, default=130.0)
     p_rep.add_argument("--d1-time", type=float, default=25.0)
     p_rep.add_argument("--surface-interval", type=float, default=90.0)
     p_rep.add_argument("--d2-depth", type=float, default=100.0)
     p_rep.add_argument("--d2-time", type=float, default=25.0)
     p_rep.add_argument("--f-o2", type=float, default=0.32)
+    p_rep.add_argument("--start-cns", type=float, default=None, help="Optional starting CNS %% for standalone NOAA 90-minute half-time surface interval decay.")
 
     # 6b. bailout-sizing
     p_bs = sub.add_parser("bailout-sizing", help="Variant 3E: Calculate CCR loop failure bailout schedule and stage cylinder sizing.")
@@ -3100,6 +3146,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 fill_pressure_psi=args.fill_psi,
                 first_switch_depth=args.switch_depth,
                 stressed_rmv_per_diver=args.stressed_rmv,
+                num_divers_sharing=args.divers,
+                problem_solving_time_min=args.problem_time,
+                ascent_rate=args.ascent_rate,
+                elevation_ft=args.elevation_ft,
+                depth_units=args.depth_units,
+                volume_units=args.volume_units,
             )
             print(json.dumps(out, indent=2))
             return 0
@@ -3118,6 +3170,27 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return 0
 
         if args.subcommand == "repetitive":
+            if args.start_cns is not None:
+                start_cns = _require_finite("start_cns", args.start_cns, "ERR_NUMERIC")
+                si_min = _require_finite("surface_interval", args.surface_interval, "ERR_SI")
+                if start_cns < 0.0:
+                    raise DivePlannerValidationError("ERR_NUMERIC", f"start_cns must be >= 0, got {start_cns}.")
+                if si_min < 0.0:
+                    raise DivePlannerValidationError("ERR_SI", f"Surface interval must be >= 0, got {si_min}.")
+                after_cns = decay_cns_surface_interval(start_cns, si_min)
+                out = {
+                    "mode": "cns_surface_interval_decay",
+                    "surface_interval_min": round(si_min, 1),
+                    "half_times_elapsed": round(si_min / 90.0, 2),
+                    "cns_before_si_pct": round(start_cns, 1),
+                    "cns_after_si_pct": round(after_cns, 1),
+                    "cns_recovered_pct": round(max(0.0, start_cns - after_cns), 1),
+                    "remaining_margin_to_80_pct": round(max(0.0, 80.0 - after_cns), 1),
+                    "remaining_margin_to_100_pct": round(max(0.0, 100.0 - after_cns), 1),
+                    "safety_notice": SAFETY_VERIFICATION_NOTICE,
+                }
+                print(json.dumps(out, indent=2))
+                return 0
             d1 = DiveConfig(
                 segments=[{"depth": args.d1_depth, "time_min": args.d1_time}],
                 oc_gases=[GasMix(name=format_gas_name(args.f_o2, 0.0), f_o2=args.f_o2, f_he=0.0, role="bottom")],

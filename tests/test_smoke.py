@@ -80,6 +80,25 @@ class TestCliSmoke(unittest.TestCase):
         self.assertEqual(plan_data["auto_selected_best_gas"]["best_mix_name"], "EAN34")
         self.assertEqual(plan_data["auto_selected_best_gas"]["f_he"], 0.0)
 
+        # Verify rock-bottom CLI parity flags and effective turn pressure governance
+        rb_cli = self._run_cli([
+            "rock-bottom", "--depth", "130", "--cylinder", "AL80", "--fill-psi", "3000",
+            "--switch-depth", "0", "--stressed-rmv", "1.00", "--divers", "2",
+            "--problem-time", "1.0", "--ascent-rate", "30",
+        ])
+        self.assertEqual(rb_cli.returncode, 0, msg=rb_cli.stderr)
+        rb_data = json.loads(rb_cli.stdout)
+        self.assertEqual(rb_data["turn_governing_rule"], "ROCK_BOTTOM")
+        self.assertGreater(rb_data["effective_turn_pressure_psi"], rb_data["rule_of_thirds_turn_pressure_psi"])
+
+        # Verify repetitive --start-cns standalone NOAA 90-minute half-time CNS decay
+        si_cli = self._run_cli(["repetitive", "--start-cns", "60", "--surface-interval", "90"])
+        self.assertEqual(si_cli.returncode, 0, msg=si_cli.stderr)
+        si_data = json.loads(si_cli.stdout)
+        self.assertEqual(si_data["mode"], "cns_surface_interval_decay")
+        self.assertEqual(si_data["cns_after_si_pct"], 30.0)
+        self.assertIn("safety_notice", si_data)
+
     def test_profile_save_recall_and_delete_lifecycle(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             temp_store = str(Path(tmpdir) / "custom_profiles.json")

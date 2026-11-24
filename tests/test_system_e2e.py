@@ -327,11 +327,17 @@ class TestSystemEndToEnd(unittest.TestCase):
     def test_dashboard_gas_blender_zero_he_and_residual_updates(self) -> None:
         html = (PROJECT_ROOT / "dashboard.html").read_text(encoding="utf-8")
 
-        # 1. Static checks: safe numeric parser, compact layout, live oninput wiring, and removal of falsy-zero fallbacks
+        # 1. Static checks: safe numeric parser, 5-tab Diver Tools layout, live oninput wiring, and removal of falsy-zero fallbacks
         self.assertIn("function readNumericInput(", html)
         self.assertIn("function setBestMixGasMode(", html)
+        self.assertIn("function syncRockBottomFromPlan(", html)
+        self.assertIn("function runUtilitySurfaceInterval(", html)
         self.assertIn('id="u2-mode-trimix"', html)
         self.assertIn('id="u2-mode-nitrox"', html)
+        self.assertIn('id="util-tab-btn-si"', html)
+        self.assertIn('id="util-tab-surface-interval"', html)
+        self.assertIn('id="btn-u4-sync-plan"', html)
+        self.assertIn('id="btn-u5-sync-plan"', html)
         self.assertIn('class="blender-mix-row"', html)
         self.assertIn('class="blender-mix-pair"', html)
         self.assertNotIn('Number(document.getElementById("u3-target-fhe").value) || 35', html)
@@ -369,6 +375,13 @@ class TestSystemEndToEnd(unittest.TestCase):
               };
             }
             const elements = {
+              'u1-depth': { value: '130' },
+              'u1-fo2': { value: '32' },
+              'u1-fhe': { value: '0' },
+              'u1-cylinder': { value: 'AL80' },
+              'u1-max-po2': { value: '1.40' },
+              'u1-max-end': { value: '100' },
+              'u1-results-box': { innerHTML: '' },
               'u2-depth': { value: '100' },
               'u2-po2': { value: '1.40' },
               'u2-end': { value: '100' },
@@ -384,10 +397,21 @@ class TestSystemEndToEnd(unittest.TestCase):
               'u3-target-fo2': { value: '21' },
               'u3-target-fhe': { value: '35' },
               'u3-results-box': { innerHTML: '' },
-              'u4-switch-depth': { value: '0' },
+              'u4-depth': { value: '180' },
+              'u4-cylinder': {
+                value: '2xLP85',
+                options: [{ value: '2xLP85' }, { value: 'AL80' }, { value: 'D12_232' }],
+              },
+              'u4-fill-pressure': { value: '2640' },
+              'u4-switch-depth': { value: '70' },
               'u4-stressed-rmv': { value: '1.00' },
-              'u4-si-min': { value: '90' },
+              'u4-divers': { value: '2' },
+              'u4-problem-min': { value: '1.0' },
+              'u4-ascent-rate': { value: '30' },
               'u4-results-box': { innerHTML: '' },
+              'u5-start-cns': { value: '60.0' },
+              'u4-si-min': { value: '90' },
+              'u5-results-box': { innerHTML: '' },
               'input-depth': { value: '180' },
               'input-time': { value: '25' },
               'input-gf-low': { value: '30' },
@@ -457,7 +481,17 @@ class TestSystemEndToEnd(unittest.TestCase):
               };
             }
 
+            function runRockBottomCase(vals) {
+              Object.keys(vals).forEach(k => { elements[k].value = String(vals[k]); });
+              ctx.runUtilityDensityAndRockBottom();
+              return elements['u4-results-box'].innerHTML;
+            }
+
+            ctx.runUtilityModAndMaxDepth();
+            const u1DensityHtml = elements['u1-results-box'].innerHTML;
+
             const results = {
+              u1_density: u1DensityHtml,
               zero_he_ean32: runBlendCase({
                 'u3-cylinder': '2xLP85', 'u3-start-psi': '500', 'u3-target-psi': '2640',
                 'u3-start-fo2': '18', 'u3-start-fhe': '45', 'u3-target-fo2': '32', 'u3-target-fhe': '0',
@@ -490,16 +524,41 @@ class TestSystemEndToEnd(unittest.TestCase):
               bestmix_130_nitrox: runBestMixCase(130, false),
               bestmix_200_nitrox: runBestMixCase(200, false),
               bestmix_200_trimix: runBestMixCase(200, true),
+              u4_thirds_governs: runRockBottomCase({
+                'u4-depth': '180', 'u4-cylinder': '2xLP85', 'u4-fill-pressure': '2640',
+                'u4-switch-depth': '70', 'u4-stressed-rmv': '1.00', 'u4-divers': '2',
+                'u4-problem-min': '1.0', 'u4-ascent-rate': '30',
+              }),
+              u4_switch_depth_zero: runRockBottomCase({
+                'u4-depth': '130', 'u4-cylinder': 'AL80', 'u4-fill-pressure': '3000',
+                'u4-switch-depth': '0', 'u4-stressed-rmv': '1.00', 'u4-divers': '2',
+                'u4-problem-min': '1.0', 'u4-ascent-rate': '30',
+              }),
             };
-            elements['u4-switch-depth'].value = '0';
-            ctx.runUtilityDensityAndRockBottom();
-            results.u4_switch_depth_zero = elements['u4-results-box'].innerHTML;
+
+            // Verify one-click Sync from Dive Plan restores active Dive Planner depth & deco switch
+            elements['input-depth'].value = '200';
+            ctx.syncRockBottomFromPlan();
+            results.u4_synced_depth = elements['u4-depth'].value;
+            results.u4_synced_switch = elements['u4-switch-depth'].value;
+
+            // Verify Tab 5 Repetitive / Surface Interval CNS % decay
+            elements['u5-start-cns'].value = '60.0';
+            elements['u4-si-min'].value = '90';
+            ctx.runUtilitySurfaceInterval();
+            results.u5_si_decay = elements['u5-results-box'].innerHTML;
+
             process.stdout.write(JSON.stringify(results));
             """.replace("SCRIPT_SRC", json.dumps(inline_js))
         )
         proc = subprocess.run([node_bin], input=harness, capture_output=True, text=True, check=False)
         self.assertEqual(proc.returncode, 0, msg=f"Node execution failed: {proc.stderr}")
         out = json.loads(proc.stdout)
+
+        # Tab 1: Verify Gas Density @ Depth and MDD (5.2 / 6.2 g/L)
+        self.assertIn("Density @ 130ft", out["u1_density"])
+        self.assertIn("MDD (5.2 / 6.2 g/L)", out["u1_density"])
+        self.assertIn("g/L", out["u1_density"])
 
         # Case 1: Target He% = 0, O2% = 32 with residual Tx 18/45 @ 500 psi -> EAN32 (NOT Tx 32/35)
         py_ean32 = p.calculate_gas_blender(
@@ -556,9 +615,29 @@ class TestSystemEndToEnd(unittest.TestCase):
         self.assertIn("[BLEND IMPOSSIBLE]", out["impossible_air_topup"])
         self.assertIn("[INVALID GAS MIX]", out["invalid_sum_over_100"])
 
-        # Case 8: Sibling falsy-zero fix on Utility Tab 4 (u4-switch-depth = 0 -> ascent to 0ft, not 70ft)
+        # Case 8: Tab 4 Rock Bottom — Rule of Thirds governs, Rock Bottom governs (switch=0), and Sync from Plan
+        py_rb_thirds = p.solve_rock_bottom(
+            depth=180.0, bottom_time_min=25.0, cylinder_preset="2xLP85",
+            fill_pressure_psi=2640.0, first_switch_depth=70.0, stressed_rmv_per_diver=1.00,
+        )
+        self.assertIn("[RULE OF THIRDS]", out["u4_thirds_governs"])
+        self.assertIn(f"<strong>{py_rb_thirds['effective_turn_pressure_psi']:.0f} psi</strong>", out["u4_thirds_governs"])
+
+        py_rb_gov = p.solve_rock_bottom(
+            depth=130.0, bottom_time_min=20.0, cylinder_preset="AL80",
+            fill_pressure_psi=3000.0, first_switch_depth=0.0, stressed_rmv_per_diver=1.00,
+        )
         self.assertIn("ascent to 0ft", out["u4_switch_depth_zero"])
         self.assertNotIn("ascent to 70ft", out["u4_switch_depth_zero"])
+        self.assertIn("[ROCK BOTTOM GOVERNS]", out["u4_switch_depth_zero"])
+        self.assertIn("[ROCK BOTTOM EXCEEDS THIRDS]", out["u4_switch_depth_zero"])
+        self.assertIn(f"<strong>{py_rb_gov['effective_turn_pressure_psi']:.0f} psi</strong>", out["u4_switch_depth_zero"])
+        self.assertEqual(str(out["u4_synced_depth"]), "200")
+        self.assertEqual(str(out["u4_synced_switch"]), "70")
+
+        # Tab 5: Repetitive / Surface Interval CNS % decay (60% over 90 min -> 30.0%)
+        self.assertIn("<td><strong>30.0%</strong></td>", out["u5_si_decay"])
+        self.assertIn("<td>1.00x</td>", out["u5_si_decay"])
 
         # Case 9-12: Best Mix Gas Mode toggle (Nitrox/Air Only vs Trimix) parity with Python engine
         bm100 = out["bestmix_100_nitrox"]
