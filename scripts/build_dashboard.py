@@ -477,6 +477,39 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       margin-bottom: 12px;
     }
 
+    .blender-mix-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 16px 48px;
+      margin-bottom: 14px;
+    }
+
+    .blender-mix-pair {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .blender-pct-field {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .blender-pct-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+
+    .blender-mix-pair input[type="number"] {
+      width: 96px;
+    }
+
     .field-group {
       display: flex;
       flex-direction: column;
@@ -782,6 +815,99 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       flex-wrap: wrap;
       gap: 10px;
     }
+
+    .print-safety-block {
+      display: none;
+    }
+
+    @media print {
+      * {
+        box-shadow: none !important;
+        text-shadow: none !important;
+      }
+
+      html,
+      body {
+        background: #FFFFFF !important;
+        color: #000000 !important;
+        font-size: 10pt;
+      }
+
+      .skip-link,
+      .navbar-controls,
+      .workspace-tabs,
+      .tab-bar,
+      .chart-hover-tooltip,
+      button,
+      input[type="file"] {
+        display: none !important;
+      }
+
+      .top-navbar {
+        position: static !important;
+        background: #FFFFFF !important;
+        border-bottom: 1.5pt solid #000000 !important;
+      }
+
+      .brand-title,
+      .brand-badge,
+      .card,
+      .kpi-card,
+      .site-footer {
+        background: #FFFFFF !important;
+        color: #000000 !important;
+        border-color: #333333 !important;
+      }
+
+      .print-safety-block {
+        display: block !important;
+        margin-top: 16pt;
+        padding: 12pt 14pt;
+        border: 1.5pt solid #000000;
+        border-radius: 4pt;
+        background: #FFFFFF !important;
+        color: #000000 !important;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+
+      .print-safety-block h2 {
+        margin: 0 0 8pt 0;
+        font-size: 10.5pt;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        border-bottom: 1pt solid #000000;
+        padding-bottom: 4pt;
+      }
+
+      .print-safety-block ol {
+        margin: 0 0 10pt 0;
+        padding-left: 16pt;
+        font-size: 8.5pt;
+        line-height: 1.4;
+      }
+
+      .print-safety-block li {
+        margin-bottom: 4pt;
+      }
+
+      .print-checklist-title {
+        margin: 8pt 0 4pt 0;
+        font-size: 9pt;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .print-checklist {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        font-family: var(--font-mono);
+        font-size: 8.5pt;
+        line-height: 1.55;
+      }
+    }
   </style>
 </head>
 <body>
@@ -805,6 +931,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
           <button type="button" id="btn-delete-profile" class="btn btn-sm" title="Delete selected profile" onclick="deleteSelectedProfileFromBrowser()">Delete</button>
           <button type="button" id="btn-export-profiles" class="btn btn-sm" title="Export profiles" onclick="exportProfilesJson()">Export</button>
           <button type="button" id="btn-import-profiles" class="btn btn-sm" title="Import profiles" onclick="document.getElementById('input-import-file').click()">Import</button>
+          <button type="button" id="btn-print-plan" class="btn btn-sm" title="Print dive plan with mandatory safety and verification notice" onclick="window.print()">Print Plan</button>
           <button type="button" id="btn-clear-local-data" class="btn btn-sm" title="Clear all locally saved profiles and preferences" onclick="clearAllLocalData()">Clear Local Data</button>
           <input type="file" id="input-import-file" aria-label="Import dive profiles JSON file" accept=".json" style="display:none;" onchange="importProfilesJson(event)" />
         </div>
@@ -1203,15 +1330,15 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
             <div class="form-grid-3">
               <div class="field-group">
                 <label for="u1-depth">Analysis Depth (<span class="unit-depth-lbl">ft</span>)</label>
-                <input type="number" id="u1-depth" value="130" min="10" max="600" step="5" onchange="runUtilityModAndMaxDepth()" />
+                <input type="number" id="u1-depth" value="130" min="10" max="600" step="5" oninput="runUtilityModAndMaxDepth()" onchange="runUtilityModAndMaxDepth()" />
               </div>
               <div class="field-group">
                 <label for="u1-fo2">Mix O2 %</label>
-                <input type="number" id="u1-fo2" value="32" min="5" max="100" step="1" onchange="runUtilityModAndMaxDepth()" />
+                <input type="number" id="u1-fo2" value="32" min="5" max="100" step="1" oninput="runUtilityModAndMaxDepth()" onchange="runUtilityModAndMaxDepth()" />
               </div>
               <div class="field-group">
                 <label for="u1-fhe">Mix He %</label>
-                <input type="number" id="u1-fhe" value="0" min="0" max="95" step="1" onchange="runUtilityModAndMaxDepth()" />
+                <input type="number" id="u1-fhe" value="0" min="0" max="95" step="1" oninput="runUtilityModAndMaxDepth()" onchange="runUtilityModAndMaxDepth()" />
               </div>
             </div>
             <div class="form-grid-3">
@@ -1230,14 +1357,14 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
               </div>
               <div class="field-group">
                 <label for="u1-max-po2">Working Max PO2 (ATA)</label>
-                <input type="number" id="u1-max-po2" value="1.40" min="1.0" max="1.6" step="0.05" onchange="runUtilityModAndMaxDepth()" />
+                <input type="number" id="u1-max-po2" value="1.40" min="1.0" max="1.6" step="0.05" oninput="runUtilityModAndMaxDepth()" onchange="runUtilityModAndMaxDepth()" />
               </div>
               <div class="field-group">
                 <label for="u1-max-end">Max END Limit (<span class="unit-depth-lbl">ft</span>)</label>
-                <input type="number" id="u1-max-end" value="100" min="30" max="160" step="5" onchange="runUtilityModAndMaxDepth()" />
+                <input type="number" id="u1-max-end" value="100" min="30" max="160" step="5" oninput="runUtilityModAndMaxDepth()" onchange="runUtilityModAndMaxDepth()" />
               </div>
             </div>
-            <div id="u1-results-box" style="margin-top:12px;"></div>
+            <div id="u1-results-box" aria-live="polite" style="margin-top:12px;"></div>
           </div>
 
           <!-- Utility Tab 2: Best Mix for Depth -->
@@ -1245,18 +1372,18 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
             <div class="form-grid-3">
               <div class="field-group">
                 <label for="u2-depth">Target Depth (<span class="unit-depth-lbl">ft</span>)</label>
-                <input type="number" id="u2-depth" value="200" min="10" max="600" step="5" onchange="runUtilityBestMix()" />
+                <input type="number" id="u2-depth" value="200" min="10" max="600" step="5" oninput="runUtilityBestMix()" onchange="runUtilityBestMix()" />
               </div>
               <div class="field-group">
                 <label for="u2-po2">Max Bottom PO2 (ATA)</label>
-                <input type="number" id="u2-po2" value="1.40" min="1.0" max="1.6" step="0.05" onchange="runUtilityBestMix()" />
+                <input type="number" id="u2-po2" value="1.40" min="1.0" max="1.6" step="0.05" oninput="runUtilityBestMix()" onchange="runUtilityBestMix()" />
               </div>
               <div class="field-group">
                 <label for="u2-end">Target Max END (<span class="unit-depth-lbl">ft</span>)</label>
-                <input type="number" id="u2-end" value="100" min="30" max="150" step="5" onchange="runUtilityBestMix()" />
+                <input type="number" id="u2-end" value="100" min="30" max="150" step="5" oninput="runUtilityBestMix()" onchange="runUtilityBestMix()" />
               </div>
             </div>
-            <div id="u2-results-box" style="margin-top:12px;"></div>
+            <div id="u2-results-box" aria-live="polite" style="margin-top:12px;"></div>
           </div>
 
           <!-- Utility Tab 3: Gas Blender, Top-Up & Fill Capacity -->
@@ -1274,30 +1401,42 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
               </div>
               <div class="field-group">
                 <label for="u3-start-psi">Residual Pressure (PSI)</label>
-                <input type="number" id="u3-start-psi" value="500" min="0" max="3500" step="50" onchange="runUtilityBlender()" />
+                <input type="number" id="u3-start-psi" value="500" min="0" max="3500" step="50" oninput="runUtilityBlender()" onchange="runUtilityBlender()" />
               </div>
               <div class="field-group">
                 <label for="u3-target-psi">Target Fill Pressure (PSI)</label>
-                <input type="number" id="u3-target-psi" value="2640" min="500" max="4500" step="50" onchange="runUtilityBlender()" />
+                <input type="number" id="u3-target-psi" value="2640" min="500" max="4500" step="50" oninput="runUtilityBlender()" onchange="runUtilityBlender()" />
               </div>
             </div>
-            <div class="form-grid-2">
+            <div class="blender-mix-row">
               <div class="field-group">
                 <label for="u3-start-fo2">Residual Gas O2 % / He %</label>
-                <div style="display:flex;gap:6px;">
-                  <input type="number" id="u3-start-fo2" aria-label="Residual Gas Oxygen Percent" value="18" min="5" max="100" step="1" onchange="runUtilityBlender()" />
-                  <input type="number" id="u3-start-fhe" aria-label="Residual Gas Helium Percent" value="45" min="0" max="95" step="1" onchange="runUtilityBlender()" />
+                <div class="blender-mix-pair">
+                  <span class="blender-pct-field">
+                    <span class="blender-pct-label" aria-hidden="true">O2%</span>
+                    <input type="number" id="u3-start-fo2" aria-label="Residual Gas Oxygen Percent" value="18" min="5" max="100" step="1" oninput="runUtilityBlender()" onchange="runUtilityBlender()" />
+                  </span>
+                  <span class="blender-pct-field">
+                    <span class="blender-pct-label" aria-hidden="true">He%</span>
+                    <input type="number" id="u3-start-fhe" aria-label="Residual Gas Helium Percent" value="45" min="0" max="95" step="1" oninput="runUtilityBlender()" onchange="runUtilityBlender()" />
+                  </span>
                 </div>
               </div>
               <div class="field-group">
                 <label for="u3-target-fo2">Desired Target O2 % / He %</label>
-                <div style="display:flex;gap:6px;">
-                  <input type="number" id="u3-target-fo2" aria-label="Target Gas Oxygen Percent" value="21" min="5" max="100" step="1" onchange="runUtilityBlender()" />
-                  <input type="number" id="u3-target-fhe" aria-label="Target Gas Helium Percent" value="35" min="0" max="95" step="1" onchange="runUtilityBlender()" />
+                <div class="blender-mix-pair">
+                  <span class="blender-pct-field">
+                    <span class="blender-pct-label" aria-hidden="true">O2%</span>
+                    <input type="number" id="u3-target-fo2" aria-label="Target Gas Oxygen Percent" value="21" min="5" max="100" step="1" oninput="runUtilityBlender()" onchange="runUtilityBlender()" />
+                  </span>
+                  <span class="blender-pct-field">
+                    <span class="blender-pct-label" aria-hidden="true">He%</span>
+                    <input type="number" id="u3-target-fhe" aria-label="Target Gas Helium Percent" value="35" min="0" max="95" step="1" oninput="runUtilityBlender()" onchange="runUtilityBlender()" />
+                  </span>
                 </div>
               </div>
             </div>
-            <div id="u3-results-box" style="margin-top:12px;"></div>
+            <div id="u3-results-box" aria-live="polite" style="margin-top:12px;"></div>
           </div>
 
           <!-- Utility Tab 4: Gas Density, Rock Bottom & What-If GF Comparison -->
@@ -1305,29 +1444,48 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
             <div class="form-grid-3">
               <div class="field-group">
                 <label for="u4-switch-depth">1st Deco Switch Depth (<span class="unit-depth-lbl">ft</span>)</label>
-                <input type="number" id="u4-switch-depth" value="70" min="0" max="200" step="10" onchange="runUtilityDensityAndRockBottom()" />
+                <input type="number" id="u4-switch-depth" value="70" min="0" max="200" step="10" oninput="runUtilityDensityAndRockBottom()" onchange="runUtilityDensityAndRockBottom()" />
               </div>
               <div class="field-group">
                 <label for="u4-stressed-rmv">Stressed RMV per Diver</label>
-                <input type="number" id="u4-stressed-rmv" value="1.00" min="0.2" max="60" step="0.1" onchange="runUtilityDensityAndRockBottom()" />
+                <input type="number" id="u4-stressed-rmv" value="1.00" min="0.2" max="60" step="0.1" oninput="runUtilityDensityAndRockBottom()" onchange="runUtilityDensityAndRockBottom()" />
               </div>
               <div class="field-group">
                 <label for="u4-si-min">Repetitive Surface Interval (m)</label>
-                <input type="number" id="u4-si-min" value="90" min="10" max="720" step="10" onchange="runUtilityDensityAndRockBottom()" />
+                <input type="number" id="u4-si-min" value="90" min="10" max="720" step="10" oninput="runUtilityDensityAndRockBottom()" onchange="runUtilityDensityAndRockBottom()" />
               </div>
             </div>
-            <div id="u4-results-box" style="margin-top:12px;"></div>
+            <div id="u4-results-box" aria-live="polite" style="margin-top:12px;"></div>
           </div>
 
         </div>
 
     </div>
 
+    <section class="print-safety-block" aria-label="Printable Dive Safety and Verification Notice">
+      <h2>Mandatory Verification, Professional Confirmation, and Assumption of Risk Notice</h2>
+      <ol>
+        <li><strong>Mandatory Verification &amp; Professional Confirmation:</strong> Theoretical mathematical estimate only (not a certified dive computer, medical device, or life-support system). You MUST independently verify all inputs and outputs against a certified dive computer, redundant planner, or recognized agency tables, and review and confirm any dive plan, bailout plan, or gas blend with a certified dive professional, technical diving instructor, or certified gas blender prior to diving.</li>
+        <li><strong>Inherent Risks:</strong> Open-circuit (OC), closed-circuit rebreather (CCR), decompression, altitude diving, and high-pressure gas blending carry inherent risks of decompression sickness (DCS), arterial gas embolism (AGE), barotrauma, CNS or pulmonary oxygen toxicity, hypoxia, hypercapnia, inert gas narcosis, CCR loop/sensor/scrubber failure, high-pressure oxygen fire or explosion, serious injury, permanent disability, or death.</li>
+        <li><strong>Theoretical Model Limitations:</strong> Calculations implement published approximations (Bühlmann ZH-L16C 1b/1, Haldane, Schreiner, Erik C. Baker Gradient Factors, NOAA CNS %, Lambertsen/Baker OTU, Real-Gas Virial Z-factor). DCS, oxygen toxicity, or other diving injuries can occur even when strictly following a computed schedule.</li>
+        <li><strong>Certification, Medical Fitness &amp; Physical Gas Analysis:</strong> Only appropriately certified and medically fit divers (e.g., RSTC Diver Medical clearance) and certified gas blenders using redundant instrumentation and conservative gas reserves may execute technical dives or blend breathing gas. Every breathing gas cylinder MUST be personally and physically analyzed with a calibrated O2/He analyzer and labeled with its MOD prior to diving.</li>
+        <li><strong>AI / Automated Output Verification:</strong> If parameters or summaries were generated through an AI agent or automated workflow, verify exact numerical inputs and outputs directly against scripts/zhl16c_planner.py.</li>
+        <li><strong>Voluntary Assumption of Risk &amp; License:</strong> By using or printing this plan, you voluntarily assume all risk. Provided &quot;AS IS&quot; without warranty or liability under Apache License 2.0 Sections 7-8 (see LICENSE, NOTICE, and legal/terms.md) to the maximum extent permitted by applicable law.</li>
+      </ol>
+      <div class="print-checklist-title">Pre-Dive Verification Checklist</div>
+      <ul class="print-checklist">
+        <li>[ ] Plan independently verified against a certified dive computer, redundant planner, or agency tables</li>
+        <li>[ ] Plan / gas blend reviewed and confirmed with a certified dive professional, instructor, or gas blender</li>
+        <li>[ ] Every breathing gas cylinder physically analyzed (calibrated O2/He analyzer) and labeled with MOD</li>
+        <li>[ ] Diver holds appropriate certification, medical clearance, redundant equipment, and conservative gas reserves</li>
+      </ul>
+    </section>
+
   </main>
 
   <footer class="site-footer">
     <span>Model: Bühlmann ZH-L16C (1b / 1) with Erik C. Baker Gradient Factors, NOAA CNS %, and Lambertsen OTU.</span>
-    <span>Execution: Local offline browser only (no external network requests). Licensed under Apache License 2.0.</span>
+    <span>Verify all outputs independently and confirm plans with a certified dive professional or instructor prior to diving.</span>
   </footer>
 
   <!-- Embedded Empirical Benchmark Data & Complete Client-Side ZH-L16C + GF Engine -->
@@ -2467,15 +2625,33 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
     // -----------------------------------------------------------------------
     // Diver Utility Tools 1, 2, 3, and 4 Live Calculators
     // -----------------------------------------------------------------------
+    function readNumericInput(elementId, fallback) {
+      const el = document.getElementById(elementId);
+      if (!el) return fallback;
+      const raw = String(el.value).trim();
+      if (raw === "") return fallback;
+      const parsed = Number(raw);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    }
+
     function runUtilityModAndMaxDepth() {
       const cfg = readCurrentConfig();
       const dUnit = cfg.depthUnits === "feet" ? "ft" : "m";
-      const depth = Number(document.getElementById("u1-depth").value) || 130;
-      const fO2 = (Number(document.getElementById("u1-fo2").value) || 32) / 100.0;
-      const fHe = (Number(document.getElementById("u1-fhe").value) || 0) / 100.0;
+      const depth = Math.max(1, readNumericInput("u1-depth", 130));
+      const o2Pct = readNumericInput("u1-fo2", 32);
+      const hePct = readNumericInput("u1-fhe", 0);
       const cylKey = document.getElementById("u1-cylinder").value;
-      const maxPo2 = Number(document.getElementById("u1-max-po2").value) || 1.40;
-      const maxEnd = Number(document.getElementById("u1-max-end").value) || 100;
+      const maxPo2 = Math.max(0.2, readNumericInput("u1-max-po2", 1.40));
+      const maxEnd = Math.max(10, readNumericInput("u1-max-end", 100));
+      const resultsBox = document.getElementById("u1-results-box");
+
+      if (o2Pct < 1 || o2Pct > 100 || hePct < 0 || hePct > 99 || o2Pct + hePct > 100.01) {
+        resultsBox.innerHTML = `<div class="alert-item" role="alert">[INVALID GAS MIX] Oxygen % must be 1-100%, Helium % must be 0-99%, and O2% + He% cannot exceed 100%.</div>`;
+        return;
+      }
+
+      const fO2 = o2Pct / 100.0;
+      const fHe = hePct / 100.0;
 
       const props = calcGasProps(depth, fO2, fHe, cfg.o2Narcotic, cfg.elevationFt, cfg.depthUnits, "OC", 1.2, maxPo2, maxEnd);
       const spec = BENCHMARK_DATA.standard_cylinders[cylKey] || BENCHMARK_DATA.standard_cylinders["AL80"];
@@ -2494,7 +2670,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
 
       const maxSafeD = Math.min(props.modWork, props.mnd, props.mdd52, tankMaxD || props.modWork);
 
-      document.getElementById("u1-results-box").innerHTML = `
+      resultsBox.innerHTML = `
         <div class="table-wrap">
           <table>
             <thead>
@@ -2531,9 +2707,9 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
     function runUtilityBestMix() {
       const cfg = readCurrentConfig();
       const dUnit = cfg.depthUnits === "feet" ? "ft" : "m";
-      const depth = Number(document.getElementById("u2-depth").value) || 200;
-      const maxPo2 = Number(document.getElementById("u2-po2").value) || 1.40;
-      const maxEnd = Number(document.getElementById("u2-end").value) || 100;
+      const depth = Math.max(1, readNumericInput("u2-depth", 200));
+      const maxPo2 = Math.max(0.2, readNumericInput("u2-po2", 1.40));
+      const maxEnd = Math.max(10, readNumericInput("u2-end", 100));
 
       const pSurf = getSurfacePressureBar(cfg.elevationFt);
       const kBar = getHydroGradientBar(cfg.depthUnits);
@@ -2584,14 +2760,33 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
 
     function runUtilityBlender() {
       const cylKey = document.getElementById("u3-cylinder").value;
-      const pStart = Math.max(0, Number(document.getElementById("u3-start-psi").value) || 0);
-      const pTarget = Math.max(100, Number(document.getElementById("u3-target-psi").value) || 2640);
-      const fO2Start = (Number(document.getElementById("u3-start-fo2").value) || 21) / 100.0;
-      const fHeStart = (Number(document.getElementById("u3-start-fhe").value) || 0) / 100.0;
+      const pStart = readNumericInput("u3-start-psi", 0);
+      const pTarget = readNumericInput("u3-target-psi", 2640);
+      const o2StartPct = readNumericInput("u3-start-fo2", 21);
+      const heStartPct = readNumericInput("u3-start-fhe", 0);
+      const o2TargetPct = readNumericInput("u3-target-fo2", 21);
+      const heTargetPct = readNumericInput("u3-target-fhe", 0);
+      const resultsBox = document.getElementById("u3-results-box");
+
+      if (pStart < 0 || pTarget <= 0) {
+        resultsBox.innerHTML = `<div class="alert-item" role="alert">[INVALID PRESSURE] Residual pressure must be &gt;= 0 psi and target fill pressure must be &gt; 0 psi.</div>`;
+        return;
+      }
+
+      if (
+        o2StartPct < 1 || o2StartPct > 100 || heStartPct < 0 || heStartPct > 99 || o2StartPct + heStartPct > 100.01 ||
+        o2TargetPct < 1 || o2TargetPct > 100 || heTargetPct < 0 || heTargetPct > 99 || o2TargetPct + heTargetPct > 100.01
+      ) {
+        resultsBox.innerHTML = `<div class="alert-item" role="alert">[INVALID GAS MIX] Oxygen % must be 1-100%, Helium % must be 0-99%, and O2% + He% cannot exceed 100% for residual or target mixes.</div>`;
+        return;
+      }
+
+      const fO2Start = o2StartPct / 100.0;
+      const fHeStart = heStartPct / 100.0;
       const fN2Start = Math.max(0, 1.0 - fO2Start - fHeStart);
 
-      const fO2Target = (Number(document.getElementById("u3-target-fo2").value) || 21) / 100.0;
-      const fHeTarget = (Number(document.getElementById("u3-target-fhe").value) || 35) / 100.0;
+      const fO2Target = o2TargetPct / 100.0;
+      const fHeTarget = heTargetPct / 100.0;
       const fN2Target = Math.max(0, 1.0 - fO2Target - fHeTarget);
 
       const pMaxHe = fHeStart > 1e-6 ? pTarget * (fHeTarget / fHeStart) : Infinity;
@@ -2600,20 +2795,33 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       const numerO2 = fO2Target - fN2Target * (AIR_F_O2 / AIR_F_N2);
       const pMaxO2 = denomO2 > 1e-6 ? Math.max(0, pTarget * (numerO2 / denomO2)) : Infinity;
 
-      const pInit = Math.max(0, Math.min(pStart, pMaxHe, pMaxN2, pMaxO2));
+      const pInit = Math.max(0, Math.min(pStart, pTarget, pMaxHe, pMaxN2, pMaxO2));
       const bleedPsi = Math.max(0, pStart - pInit);
-      const addHe = Math.max(0, pTarget * fHeTarget - pInit * fHeStart);
-      const addAir = Math.max(0, (pTarget * fN2Target - pInit * fN2Start) / AIR_F_N2);
-      const addO2 = Math.max(0, pTarget - pInit - addHe - addAir);
+      const rawAddHe = pTarget * fHeTarget - pInit * fHeStart;
+      const rawAddAir = (pTarget * fN2Target - pInit * fN2Start) / AIR_F_N2;
+      const rawAddO2 = pTarget - (pInit + rawAddHe) - rawAddAir;
+
+      if (rawAddHe < -0.5 || rawAddO2 < -0.5 || rawAddAir < -0.5) {
+        resultsBox.innerHTML = `<div class="alert-item" role="alert">[BLEND IMPOSSIBLE] Target mix ${escapeHtml(formatGasName(fO2Target, fHeTarget))} cannot be blended using Air (21% O2) top-up (computed O2 delta = ${rawAddO2.toFixed(1)} psi; requires pure N2/Argon or lower-O2 top-up bank).</div>`;
+        return;
+      }
+
+      const addHe = Math.max(0, rawAddHe);
+      const addO2 = Math.max(0, rawAddO2);
+      const addAir = Math.max(0, pTarget - pInit - addHe - addO2);
 
       const spec = BENCHMARK_DATA.standard_cylinders[cylKey] || BENCHMARK_DATA.standard_cylinders["2xLP85"];
       const idealCuft = spec.rated_cuft * (pTarget / spec.rated_psi);
+      const residualLabel = pStart > 0
+        ? `${formatGasName(fO2Start, fHeStart)} @ ${pStart.toFixed(0)} psi`
+        : "Empty (0 psi)";
 
-      document.getElementById("u3-results-box").innerHTML = `
+      resultsBox.innerHTML = `
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
+                <th scope="col">Residual Mix</th>
                 <th scope="col">Target Mix</th>
                 <th scope="col">Bleed Down</th>
                 <th scope="col">Step 1: Start PSI</th>
@@ -2625,6 +2833,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
             </thead>
             <tbody>
               <tr>
+                <td>${escapeHtml(residualLabel)}</td>
                 <td><strong>${escapeHtml(formatGasName(fO2Target, fHeTarget))}</strong></td>
                 <td>${bleedPsi.toFixed(0)} psi</td>
                 <td>${pInit.toFixed(0)} psi</td>
@@ -2643,9 +2852,9 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       const cfg = readCurrentConfig();
       const dUnit = cfg.depthUnits === "feet" ? "ft" : "m";
       const vUnit = cfg.volumeUnits;
-      const swDepth = Number(document.getElementById("u4-switch-depth").value) || 70;
-      const stressedRmv = Number(document.getElementById("u4-stressed-rmv").value) || 1.00;
-      const siMin = Number(document.getElementById("u4-si-min").value) || 90;
+      const swDepth = Math.max(0, readNumericInput("u4-switch-depth", 70));
+      const stressedRmv = Math.max(0.1, readNumericInput("u4-stressed-rmv", 1.00));
+      const siMin = Math.max(0, readNumericInput("u4-si-min", 90));
 
       const pSurf = getSurfacePressureBar(cfg.elevationFt);
       const kBar = getHydroGradientBar(cfg.depthUnits);
@@ -2953,6 +3162,11 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       flashProfileStatus("[DELETED PROFILE]");
     }
 
+    const SAFETY_VERIFICATION_NOTICE =
+      'SAFETY & VERIFICATION NOTICE: Theoretical mathematical estimate only (not a certified dive computer or life-support system). ' +
+      'You MUST independently verify all outputs, confirm any dive plan or gas blend with a certified dive professional, instructor, or gas blender, ' +
+      'and physically analyze every cylinder (O2/He) before diving. Provided "AS IS" under Apache License 2.0 (see LICENSE, NOTICE, legal/terms.md); you assume all risk.';
+
     function exportProfilesJson() {
       const customList = getCustomProfiles();
       const currentEntry = {
@@ -2964,6 +3178,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       const exportPayload = {
         dataset_name: "exported_technical_dive_profiles",
         description: "Exported technical scuba diving profiles.",
+        safety_notice: SAFETY_VERIFICATION_NOTICE,
         profiles: customList.length > 0 ? customList : [currentEntry]
       };
       const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/json" });

@@ -55,8 +55,8 @@ When a user submits a dive planning or gas calculation request:
    ```bash
    python3 scripts/build_dashboard.py
    ```
-5. **Present Verified Results**:
-   Report the exact numerical outputs from `scripts/zhl16c_planner.py` in structured markdown tables, and highlight any physiological or gas logistics warnings (`HYPOXIC_WARNING`, `HYPEROXIC_WARNING`, `GAS_DENSITY_ALERT`, `GAS_RESERVE_WARNING`).
+5. **Present Verified Results with Mandatory Safety Notice**:
+   Report the exact numerical outputs from `scripts/zhl16c_planner.py` in structured markdown tables, highlight any physiological or gas logistics warnings (`HYPOXIC_WARNING`, `HYPEROXIC_WARNING`, `GAS_DENSITY_ALERT`, `GAS_RESERVE_WARNING`), and **always include** the verification notice reminding the user that outputs are theoretical mathematical estimates only and that they must independently verify all numbers, confirm any dive plan or gas blend with a certified dive professional, instructor, or gas blender, and physically analyze every cylinder (O2/He) before diving (see `NOTICE` and `legal/terms.md`).
 
 ---
 
@@ -181,4 +181,6 @@ python3 scripts/zhl16c_planner.py blend \
 - `assets/skill_overview.png`: Architectural and dashboard overview diagram illustrating the skill execution pipeline, data inputs/outputs, and interactive UI preview.
 - `assets/synthetic_dive_profiles.json`: Reference technical dive benchmark profiles and cylinder configurations.
 - `DESIGN.md`: Architectural UI design system rules enforced by `scripts/build_dashboard.py` when generating `dashboard.html`.
-- `LICENSE`: Apache License, Version 2.0 governing the project.
+- `LICENSE`: Verbatim Apache License, Version 2.0 governing the project.
+- `NOTICE`: Apache License 2.0 Section 4(d) companion attribution and mandatory dive-safety verification and assumption-of-risk notice.
+- `legal/terms.md`: Draft open-source terms of use detailing mandatory independent verification, dive-professional confirmation, inherent diving/blending risks, physical gas analysis, and assumption of risk (`DRAFT — REQUIRES LEGAL REVIEW`).

@@ -1,0 +1,71 @@
+tech-dive-skills (tech-dive-planner)
+Copyright tech-dive-skills Open-Source Contributors
+
+This product includes software developed by the tech-dive-skills Open-Source
+Contributors and licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Published Decompression, Oxygen Toxicity, and Gas Physics Models Implemented:
+- Dr. Albert A. Bühlmann ZH-L16C (Compartment 1b and Compartment 1) dissolved-gas
+  decompression model
+- Haldane (isobaric) and Schreiner (linear depth-change) inert gas transport
+  equations
+- Erik C. Baker Gradient Factors (GF Low / GF High) ceiling and linear ramp model
+- NOAA / Erik C. Baker 7-segment piecewise linear CNS % oxygen toxicity model
+  and 90-minute half-time surface interval decay
+- Lambertsen / Baker Pulmonary Oxygen Toxicity Units (OTU / UPTD) model
+- Real-Gas Virial Z-factor compressibility equations and UHMS/DAN gas density
+  reference thresholds (5.2 g/L and 6.2 g/L)
+
+================================================================================
+MANDATORY VERIFICATION, PROFESSIONAL CONFIRMATION, AND ASSUMPTION OF RISK NOTICE
+[DRAFT — REQUIRES LEGAL REVIEW]
+================================================================================
+
+1. MANDATORY INDEPENDENT VERIFICATION AND PROFESSIONAL CONFIRMATION
+   This software generates theoretical mathematical estimates only. It is NOT a
+   certified dive computer, medical device, or life-support system. Before
+   relying on any dive plan, decompression schedule, gas reserve calculation,
+   bailout plan, or gas-blending recipe produced by this software, you MUST:
+   (a) independently verify all inputs and numerical outputs against a certified
+       dive computer, redundant decompression planner, or recognized agency
+       tables; and
+   (b) review and confirm the plan or gas blend with a certified dive
+       professional, technical diving instructor, or certified gas blender.
+
+2. INHERENT RISKS OF SCUBA DIVING AND HIGH-PRESSURE GAS BLENDING
+   Open-circuit (OC), closed-circuit rebreather (CCR), decompression, altitude
+   diving, and high-pressure oxygen/trimix gas blending are inherently hazardous
+   activities that carry severe risks, including decompression sickness (DCS),
+   arterial gas embolism (AGE), pulmonary barotrauma, central nervous system
+   (CNS) or pulmonary oxygen toxicity, hypoxia, hypercapnia, inert gas narcosis,
+   CCR loop/sensor/scrubber failure, oxygen-enriched fire or explosion during
+   blending, serious personal injury, permanent disability, or death.
+
+3. THEORETICAL MODEL LIMITATIONS AND NO PHYSIOLOGICAL GUARANTEE
+   Mathematical decompression and oxygen toxicity models are simplified
+   approximations and cannot predict individual physiological susceptibility.
+   Decompression sickness, oxygen toxicity, or other diving injuries can occur
+   even when a diver strictly follows a computed schedule within published
+   model limits.
+
+4. CERTIFICATION, MEDICAL FITNESS, PHYSICAL GAS ANALYSIS, AND AI VERIFICATION
+   Only divers and gas blenders holding appropriate agency certification,
+   current medical fitness for diving (such as an RSTC Diver Medical clearance),
+   and redundant dive equipment may conduct technical dives or blend breathing
+   gases. Every breathing gas cylinder MUST be personally and physically
+   analyzed with a calibrated oxygen (and helium, where applicable) analyzer
+   and clearly labeled with its Maximum Operating Depth (MOD) before diving.
+   When invoked through an AI agent or automated workflow, users must verify
+   exact parameters and numerical outputs from scripts/zhl16c_planner.py
+   directly to prevent transcription or interpretation errors.
+
+5. VOLUNTARY ASSUMPTION OF RISK, "AS IS" DISCLAIMER, AND LIMITATION OF LIABILITY
+   By using this software or any printout or export derived from it, you
+   voluntarily assume all risk of injury, disability, death, or property damage.
+   Consistent with Sections 7 and 8 of the Apache License, Version 2.0 (see
+   LICENSE and legal/terms.md), the tech-dive-skills Open-Source Contributors
+   provide this software on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
+   OF ANY KIND, either express or implied, and shall not be liable for any
+   direct, indirect, special, incidental, consequential, or personal-injury
+   damages arising from its use or inability to use, to the maximum extent
+   permitted by applicable law.

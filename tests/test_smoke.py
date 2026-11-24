@@ -30,12 +30,16 @@ class TestCliSmoke(unittest.TestCase):
         res_table = self._run_cli(["plan", "--depth", "150", "--time", "25", "--auto-best-gas"])
         self.assertEqual(res_table.returncode, 0, msg=res_table.stderr)
         self.assertIn("ZHL-16C (1b)", res_table.stdout)
+        self.assertIn("SAFETY & VERIFICATION NOTICE", res_table.stdout)
+        self.assertIn("certified dive professional", res_table.stdout)
 
         res_json = self._run_cli(["--json", "plan", "--depth", "180", "--time", "25", "--auto-best-gas"])
         self.assertEqual(res_json.returncode, 0, msg=res_json.stderr)
         data = json.loads(res_json.stdout)
         self.assertIn("primary_plan", data)
         self.assertTrue(data["primary_plan"]["summary"]["is_deco_dive"])
+        self.assertIn("safety_notice", data)
+        self.assertIn("certified dive professional", data["safety_notice"])
 
     def test_all_variant_and_utility_subcommands(self) -> None:
         commands = [
@@ -57,6 +61,9 @@ class TestCliSmoke(unittest.TestCase):
                 self.assertEqual(proc.returncode, 0, msg=f"{cmd} failed: {proc.stderr}")
                 parsed = json.loads(proc.stdout)
                 self.assertIsInstance(parsed, dict)
+                if cmd[0] != "profiles":
+                    self.assertIn("safety_notice", parsed, msg=f"Missing safety_notice in {cmd[0]} output")
+                    self.assertIn("SAFETY & VERIFICATION NOTICE", parsed["safety_notice"])
 
     def test_profile_save_recall_and_delete_lifecycle(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

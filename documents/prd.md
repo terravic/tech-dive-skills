@@ -7,7 +7,7 @@
 **Core Engine Script:** `scripts/zhl16c_planner.py`  
 **Dashboard Generator Script:** `scripts/build_dashboard.py`  
 **Standalone Dashboard Output:** `dashboard.html`  
-**License:** Apache License 2.0 (`LICENSE`)
+**License:** Apache License 2.0 (`LICENSE` and companion `NOTICE`)
 
 ---
 
@@ -42,7 +42,7 @@ The `tech-dive-planner` skill serves two primary user groups across command-line
 | **Breathing Systems** | Open Circuit (`OC`), Constant-Setpoint Closed Circuit Rebreather (`CCR`), and `CCR -> OC Bailout` emergency ascent planning. | Semi-closed rebreathers (SCR/pSCR) with variable orifice-dependent loop fractions. |
 | **Physiological Metrics** | NOAA 7-segment piecewise linear `CNS %` (with 90-min surface decay), Lambertsen/Baker `OTU`, `EAD`, `END` (with `o2_narcotic` boolean toggle), `MOD`, `MinOD`, `MND`, and Gas Density ($\text{g/L}$) with $5.2\text{ g/L}$ and $6.2\text{ g/L}$ thresholds. | Real-time biometric sensor telemetry ingestion or medical diagnosis of decompression sickness (DCS). |
 | **Gas Logistics & Blending** | Bottom and Deco RMV/SAC volume calculation, standard cylinder library, Rule of Thirds / Rock Bottom turn pressures, Partial-Pressure Nitrox/Trimix blending, bleed-down calculation, Any-Gas Top-Up, and Real-Gas Virial $Z$-factor compressibility. | Automated hardware compressor valve actuation. |
-| **Profile Persistence & UI** | CLI tabular + JSON outputs, CLI profile store management (`profiles --action list|save|delete` and `plan --save-profile-id`), and a standalone `dashboard.html` with in-browser profile saving (`localStorage`), JSON export/import, and Light/Dark/System theme switching. | External cloud database persistence or remote third-party runtime dependencies. |
+| **Profile Persistence & UI** | CLI tabular + JSON outputs, CLI profile store management (`profiles --action list|save|delete` and `plan --save-profile-id`), and a standalone `dashboard.html` with in-browser profile saving (`localStorage`), JSON export/import, printable plan layout (`Print Plan`), and Light/Dark/System theme switching. | External cloud database persistence or remote third-party runtime dependencies. |
 
 ---
 
@@ -86,7 +86,7 @@ The `tech-dive-planner` skill serves two primary user groups across command-line
 |  - assets/skill_overview.png           |   |  - Theme Mode Switcher (L/D/Sys)     |
 |  - assets/synthetic_dive_profiles.json |   |  - In-Browser Profile Save & Recall  |
 |  - references/zhl16c_math_reference.md |   |  - Live Bento Grid & 4 Utility Tools |
-|  - DESIGN.md & LICENSE                 |   |                                      |
+|  - DESIGN.md, LICENSE & NOTICE         |   |  - Print Plan & Safety Verification  |
 +----------------------------------------+   +--------------------------------------+
 ```
 
@@ -117,6 +117,7 @@ All project files are organized using relative paths from the repository root:
 .
 |-- DESIGN.md
 |-- LICENSE
+|-- NOTICE
 |-- PRD.md
 |-- README.md
 |-- SECURITY_AUDIT.md
@@ -304,7 +305,7 @@ $$GF\left(D_{\text{next}}\right) = GF_{\text{low}} + \left(GF_{\text{high}} - GF
     2. `Best Mix` (`#util-tab-bestmix`)
     3. `Gas Blender` (`#util-tab-blender`)
     4. `Gas Density & Rock Bottom` (`#util-tab-density`)
-- **Profile Persistence & Erasure Controls**: Top navigation bar supports `New`, `Save`, `Delete`, `Export` (machine-readable JSON), `Import` (1 MB size-capped, schema-validated, prototype-pollution-safe JSON), and `Clear Local Data` (`clearAllLocalData()`).
+- **Profile Persistence, Printing, & Erasure Controls**: Top navigation bar supports `New`, `Save`, `Delete`, `Export` (machine-readable JSON including top-level `safety_notice` metadata), `Import` (1 MB size-capped, schema-validated, prototype-pollution-safe JSON), `Print Plan` (`#btn-print-plan`, triggering browser `@media print` output with a dedicated 6-clause mandatory verification, dive-professional confirmation, and assumption-of-risk notice plus printable pre-dive verification checklist), and `Clear Local Data` (`clearAllLocalData()`).
 
 ---
 
@@ -324,6 +325,9 @@ $$GF\left(D_{\text{next}}\right) = GF_{\text{low}} + \left(GF_{\text{high}} - GF
    - All file lookups in `scripts/`, `tests/`, and `SKILL.md` resolve relative to the project root directory using `pathlib.Path(__file__).resolve().parent.parent`.
 5. **Algorithmic Completeness:**
    - Every function in `scripts/zhl16c_planner.py` and `dashboard.html` executes the full mathematical specification across all 16 compartments and gas transport equations.
+6. **Mandatory Safety Verification & Licensing Disclosures:**
+   - Verbatim Apache License, Version 2.0 (`LICENSE`) is accompanied by a root `NOTICE` file (Apache License 2.0 Section 4(d)) and `legal/terms.md`.
+   - Every CLI calculation JSON response and browser JSON export carries an additive top-level `safety_notice` string, every CLI table plan prints a `SAFETY & VERIFICATION NOTICE` box, and every printed browser plan (`Print Plan`) renders the full mandatory verification, dive-professional confirmation, physical gas analysis, and assumption-of-risk notice.
 
 ---
 

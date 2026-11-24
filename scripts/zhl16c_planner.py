@@ -25,6 +25,30 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 LOGGER = logging.getLogger("zhl16c_planner")
 
+SAFETY_VERIFICATION_NOTICE: str = (
+    "SAFETY & VERIFICATION NOTICE: Theoretical mathematical estimate only "
+    "(not a certified dive computer or life-support system). You MUST independently "
+    "verify all outputs, confirm any dive plan or gas blend with a certified dive "
+    "professional, instructor, or gas blender, and physically analyze every cylinder "
+    "(O2/He) before diving. Provided \"AS IS\" under Apache License 2.0 "
+    "(see LICENSE, NOTICE, legal/terms.md); you assume all risk."
+)
+
+SAFETY_VERIFICATION_TABLE_LINES: Tuple[str, ...] = (
+    "SAFETY & VERIFICATION NOTICE (MANDATORY PRE-DIVE CHECK):",
+    "  1. VERIFY & CONFIRM: Theoretical mathematical estimate only (not a certified dive computer",
+    "     or life-support system). Independently verify all numerical outputs and confirm any dive",
+    "     plan or gas blend with a certified dive professional, instructor, or gas blender.",
+    "  2. INHERENT RISKS & MODEL LIMITS: Scuba diving, decompression, altitude diving, and",
+    "     high-pressure gas blending carry inherent risks (DCS, AGE, barotrauma, CNS/pulmonary O2",
+    "     toxicity, hypoxia, hypercapnia, narcosis, CCR failure, O2 fire/explosion, injury, or",
+    "     death). DCS or O2 toxicity can occur even when strictly following a computed schedule.",
+    "  3. GAS ANALYSIS & CERTIFICATION: Hold appropriate agency certification and medical fitness;",
+    "     personally analyze every cylinder (calibrated O2/He analyzer) and label its MOD.",
+    "  4. ASSUMPTION OF RISK & LICENSE: Provided \"AS IS\" under Apache License 2.0 without warranty",
+    "     or liability (see LICENSE, NOTICE, legal/terms.md). You voluntarily assume all risk.",
+)
+
 # ---------------------------------------------------------------------------
 # Physical Constants
 # ---------------------------------------------------------------------------
@@ -567,6 +591,7 @@ def calculate_ead_end_mod_density(
         "density_status": density_status,
         "mdd_5_2_g_l": round(mdd_5_2, 1),
         "mdd_6_2_g_l": round(mdd_6_2, 1),
+        "safety_notice": SAFETY_VERIFICATION_NOTICE,
     }
 
 
@@ -706,9 +731,10 @@ def calculate_best_mix_for_depth(
         "f_he": f_he_best,
         "f_n2": f_n2_best,
         "is_hypoxic_at_surface": f_o2_best < 0.18,
-        "properties_at_depth": best_props,
+        "properties_at_depth": {k: v for k, v in best_props.items() if k != "safety_notice"},
         "closest_standard_agency_mix": recommended_standard,
         "recommended_deco_gases": recommended_deco_gases,
+        "safety_notice": SAFETY_VERIFICATION_NOTICE,
     }
 
 
@@ -840,6 +866,7 @@ def calculate_gas_blender(
             "mod_working_fsw": props["mod_working"],
             "mod_deco_fsw": props["mod_deco"],
             "cylinder_capacity": cap,
+            "safety_notice": SAFETY_VERIFICATION_NOTICE,
         }
 
     # Mode A: Partial-Pressure Blending (He + O2 + Top-Up Gas with Bleed-Down check)
@@ -927,6 +954,7 @@ def calculate_gas_blender(
         "real_gas_z_adjusted_helium": round(real_dp_he, 1),
         "continuous_nitrox_stick_f_o2_needed": round(continuous_nitrox_f_o2, 4),
         "cylinder_capacity": cap,
+        "safety_notice": SAFETY_VERIFICATION_NOTICE,
     }
 
 
@@ -1725,7 +1753,7 @@ def plan_dive(
             depth_units=cfg.depth_units,
             water_type=cfg.water_type,
         )
-        auto_selected_info = best
+        auto_selected_info = {k: v for k, v in best.items() if k != "safety_notice"}
         bottom_mix = GasMix(
             name=best["best_mix_name"],
             f_o2=best["f_o2"],
@@ -1823,6 +1851,7 @@ def plan_dive(
         "auto_selected_best_gas": auto_selected_info,
         "primary_plan": primary,
         "bailout_plan": bailout_plan,
+        "safety_notice": SAFETY_VERIFICATION_NOTICE,
         "_final_n2_raw": final_n2,
         "_final_he_raw": final_he,
     }
@@ -1944,6 +1973,7 @@ def solve_max_time_at_depth(
         "po2_at_depth_ata": props["po2_at_depth_ata"],
         "end_at_depth": props["end"],
         "density_at_depth_g_l": props["density_at_depth_g_l"],
+        "safety_notice": SAFETY_VERIFICATION_NOTICE,
     }
 
 
@@ -2075,6 +2105,7 @@ def solve_max_depth_envelope(
         "max_safe_operating_depth": round(max_safe_depth, 1),
         "limiting_factor": limiting_factor,
         "depth_time_envelope": envelope_table,
+        "safety_notice": SAFETY_VERIFICATION_NOTICE,
     }
 
 
@@ -2149,6 +2180,7 @@ def solve_rock_bottom(
         "rock_bottom_pressure_psi": round(rock_bottom_psi, 0),
         "rock_bottom_pressure_bar": round(rock_bottom_psi / P0_PSI * P0_BAR, 0),
         "rule_of_thirds_turn_pressure_psi": round(thirds_turn_psi, 0),
+        "safety_notice": SAFETY_VERIFICATION_NOTICE,
     }
 
 
@@ -2201,7 +2233,10 @@ def solve_what_if_comparison(
                 "final_otu": s["final_otu"],
             })
 
-    return {"scenarios": scenarios}
+    return {
+        "scenarios": scenarios,
+        "safety_notice": SAFETY_VERIFICATION_NOTICE,
+    }
 
 
 def solve_repetitive_dive(
@@ -2255,6 +2290,7 @@ def solve_repetitive_dive(
         "dive_1": res1["primary_plan"]["summary"],
         "dive_2": res2["primary_plan"]["summary"],
         "dive_2_full_plan": res2["primary_plan"],
+        "safety_notice": SAFETY_VERIFICATION_NOTICE,
     }
 
 
@@ -2358,6 +2394,7 @@ def solve_ccr_bailout_sizing(
         "bailout_summary": bo["summary"],
         "stage_cylinder_recommendations": stage_recommendations,
         "recommended_diluent_for_depth": best["best_mix_name"],
+        "safety_notice": SAFETY_VERIFICATION_NOTICE,
     }
 
 
@@ -2673,6 +2710,10 @@ def _print_plan_table(result: Dict[str, Any]) -> None:
         for w in plan["warnings"]:
             print(f"  * {w}")
         print("-" * 96)
+    print("=" * 96)
+    for notice_line in SAFETY_VERIFICATION_TABLE_LINES:
+        print(notice_line)
+    print("=" * 96)
 
 
 def build_arg_parser() -> argparse.ArgumentParser:

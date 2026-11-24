@@ -11,7 +11,7 @@
   - No database server, SQL/NoSQL store, HTTP backend, authentication layer, password store, session cookies, webhooks, API tokens, or remote telemetry endpoints.
   - Client-side persistence is limited to optional browser `localStorage` keys (`zhl16c-custom-profiles`, `theme-preference`) with JSON export (`Export`), validated JSON import (`Import`), per-profile deletion (`Delete`), and single-action erasure (`Clear Local Data`).
   - Zero external font, CDN, embed, avatar, or script network calls, enforced via an offline Content-Security-Policy meta directive (`default-src 'none'; connect-src 'none'`).
-- **License**: Apache License, Version 2.0 (`LICENSE`).
+- **License**: Apache License, Version 2.0 (`LICENSE` and companion `NOTICE`).
 
 ---
 
@@ -33,7 +33,7 @@
 | A-003 | WCAG Semantics / Labels | Medium | `scripts/build_dashboard.py:809`, `scripts/build_dashboard.py:898-905`, `scripts/build_dashboard.py:1274-1284`, `scripts/build_dashboard.py:1311-1314`, `scripts/build_dashboard.py:1956-1975` | Missing `<footer>` landmark; unlabeled static and dynamic form controls; empty action `<th>`; missing `scope="col"` on table headers. | Added semantic `<footer class="site-footer">`, explicit `aria-label` attributes on all static and dynamic inputs/buttons, `scope="col"` on all `<th>` elements, and an `Action` column header. | No | Fixed |
 | A-004 | Visual Cues & Theme Controls | Medium | `scripts/build_dashboard.py:825-827`, `scripts/build_dashboard.py:2293-2375` | 16-compartment tissue loading bars conveyed state by color alone without text status tags or `role="progressbar"`; theme switcher buttons used textless SVG icons. | Added `role="progressbar"` ARIA attributes and bracketed text state tags (`[OK]`, `[CAUTION]`, `[OVER GF]`) to compartment bars; formatted status badges with explicit bracketed tags; replaced the three theme switcher SVG icons with text labels (`Light`, `Dark`, `System`) preserving all button IDs, titles, and ARIA attributes. | No | Fixed |
 | P-001 | Local Data Erasure | Low | `scripts/build_dashboard.py:808`, `scripts/build_dashboard.py:2774-2787` | Browser `localStorage` supported JSON export and single-profile deletion, but had no single-action erasure control for all locally stored data. | Added `Clear Local Data` (`#btn-clear-local-data` / `clearAllLocalData()`) removing `zhl16c-custom-profiles` and `theme-preference` from `localStorage`. | No | Fixed |
-| L-001 | Legal Templates | Low | `legal/privacy.md`, `legal/terms.md`, `legal/refunds.md`, `legal/cookies.md` | Draft legal policy templates were absent. | Added four OSS-scoped draft templates in `legal/` attributed to `tech-dive-skills` Open-Source Contributors, marked `DRAFT — REQUIRES LEGAL REVIEW`, covering offline local-only storage, Apache 2.0 licensing, zero fees/cookies/processors, and technical diving risk disclaimers. | No | Human-Action-Required (OSS Drafts Created) |
+| L-001 | Legal Templates & Safety Notices | Low | `NOTICE`, `legal/privacy.md`, `legal/terms.md`, `legal/refunds.md`, `legal/cookies.md`, `scripts/zhl16c_planner.py`, `scripts/build_dashboard.py` | Draft legal policy templates, Apache 2.0 Section 4(d) companion `NOTICE`, and output/printout verification disclaimers were absent. | Preserved verbatim Apache License 2.0 (`LICENSE`); added root `NOTICE`, expanded `legal/terms.md` and `legal/*.md` OSS-scoped drafts marked `DRAFT — REQUIRES LEGAL REVIEW`, appended mandatory verification and assumption-of-risk notices to CLI tables, CLI/Export JSON (`safety_notice`), and `dashboard.html` `@media print` printouts (`Print Plan`). | No | Human-Action-Required (OSS Drafts Created) |
 
 ---
 
@@ -57,5 +57,5 @@
 
 ## 4. Human-Action-Required Items
 
-1. **Legal Counsel Review (`L-001`)**: For standard free open-source distribution under Apache License 2.0, optionally have legal counsel review the technical diving safety disclaimer and OSS notices in `legal/terms.md`, `legal/privacy.md`, `legal/cookies.md`, and `legal/refunds.md`. Full legal entity, jurisdiction, DPA/transfer, and refund customization is only required if a downstream operator hosts the dashboard online or offers a paid/commercial service.
+1. **Legal Counsel Review (`L-001`)**: For standard free open-source distribution under Apache License 2.0, optionally have legal counsel review the technical diving safety disclaimer and OSS notices in `NOTICE`, `legal/terms.md`, `legal/privacy.md`, `legal/cookies.md`, and `legal/refunds.md`. Full legal entity, jurisdiction, DPA/transfer, participant waiver, and refund customization is only required if a downstream operator hosts the dashboard online or offers a paid/commercial service.
 2. **Git History**: Full history scan (`git log -p --all`) confirmed zero committed secrets or prohibited personal identifiers; no git history rewrite is needed.

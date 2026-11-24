@@ -22,6 +22,7 @@ All paths are relative to the project root directory:
 .
 |-- DESIGN.md
 |-- LICENSE
+|-- NOTICE
 |-- PRD.md
 |-- README.md
 |-- SECURITY_AUDIT.md
@@ -58,13 +59,14 @@ All paths are relative to the project root directory:
 - `DESIGN.md`: Visual, accessibility, and technical specification for the HTML dashboard.
 - `PRD.md` and `documents/prd.md`: Product Requirement Document detailing user stories, technical architecture, functional/non-functional requirements, and error handling.
 - `SECURITY_AUDIT.md`: Security, sanitization, privacy, and accessibility audit register and verification log.
-- `LICENSE`: Apache License 2.0 terms and conditions governing the project.
-- `dashboard.html`: Self-contained offline interactive HTML5 dive planner and gas calculator dashboard.
+- `LICENSE`: Verbatim Apache License, Version 2.0 governing the project.
+- `NOTICE`: Apache License 2.0 Section 4(d) companion attribution and mandatory dive-safety verification and assumption-of-risk notice.
+- `dashboard.html`: Self-contained offline interactive HTML5 dive planner and gas calculator dashboard with printable plan layout (`Print Plan`).
 - `requirements.txt`: Python package list (core calculations use the Python Standard Library; optional test runners are listed for convenience).
 - `assets/dive_plan_schema.json`: Strict JSON Schema defining the input configuration and output schedule structure.
 - `assets/skill_overview.png`: Architectural and dashboard overview diagram illustrating the skill execution pipeline, data inputs/outputs, and interactive UI preview.
 - `assets/synthetic_dive_profiles.json`: Reference technical dive profiles and cylinder presets loaded by the CLI and dashboard.
-- `legal/privacy.md`, `legal/terms.md`, `legal/refunds.md`, `legal/cookies.md`: Draft legal policy templates marked for legal review.
+- `legal/privacy.md`, `legal/terms.md`, `legal/refunds.md`, `legal/cookies.md`: Draft legal policy templates marked for legal review, including detailed dive-safety, verification, and assumption-of-risk terms in `legal/terms.md`.
 - `references/zhl16c_math_reference.md`: Mathematical reference covering ZH-L16C (`1b` and `1`) coefficients, Haldane/Schreiner equations, Gradient Factors, NOAA CNS, and Lambertsen OTU formulas.
 - `scripts/zhl16c_planner.py`: Deterministic ZH-L16C + GF decompression engine, gas utility calculators, and profile manager CLI.
 - `scripts/build_dashboard.py`: Generator script that embeds the reference profiles into `dashboard.html`.
@@ -125,7 +127,7 @@ When this skill is loaded in your agent workspace, state your dive parameters or
 Open `dashboard.html` in any web browser (double-click the file in your file manager). No internet connection or local server is needed. The main page is organized into two primary workspace tabs at the top of the screen:
 
 1. **Main Tab 1 (`Dive Planner`)**:
-   - **Open, Create, or Manage a Profile**: Select an existing dive profile from the top **Profile** dropdown menu, click **`New`** to initialize a fresh dive profile, **`Save`** to persist the current profile in browser `localStorage`, **`Delete`** to remove a saved profile, **`Export`** / **`Import`** to back up or load JSON profile files, or **`Clear Local Data`** to erase all locally stored profiles and theme preferences.
+   - **Open, Create, or Manage a Profile**: Select an existing dive profile from the top **Profile** dropdown menu, click **`New`** to initialize a fresh dive profile, **`Save`** to persist the current profile in browser `localStorage`, **`Delete`** to remove a saved profile, **`Export`** / **`Import`** to back up or load JSON profile files (exports include `safety_notice` metadata), **`Print Plan`** to print or save a PDF dive plan with the full mandatory verification notice and pre-dive verification checklist, or **`Clear Local Data`** to erase all locally stored profiles and theme preferences.
    - **Choose Circuit Mode, Units, and Theme**: Switch between **`OC`** and **`CCR`**, toggle **`FT / CUFT`** vs. **`M / LITERS`**, and switch themes using the **`Light`**, **`Dark`**, and **`System`** controls.
    - **Configure Dive Parameters**: Enter target depth and bottom time in **Dive Profile** (or click **`Auto Best Gas`**), edit cylinders and mixes in **Gas Mixes**, adjust **`GF Low`** / **`GF High`** and Compartment `1b`/`1` in **Gradient Factors & Algorithm**, and tune stops, ascent/descent rates, RMV, and altitude in **Stops, Rates & RMV**.
    - **Review Ascent & Telemetry**: Inspect the 4 KPI summary cards, the interactive **Depth & Decompression Ceiling** SVG chart (hover with mouse or focus and use `Left`/`Right` arrow keys), and the **Decompression Schedule**, **Cylinder Gas**, and **Tissue Compartments** tabs.
@@ -213,6 +215,19 @@ python3 scripts/build_dashboard.py
 
 ---
 
-## 5. License
+## 5. Safety Notice & Mandatory Verification
 
-This project is licensed under the Apache License, Version 2.0. See the [`LICENSE`](LICENSE) file for details.
+This software computes **theoretical mathematical estimates only** and is **not** a certified dive computer, medical device, or life-support system. Before diving or blending breathing gas using any output, printout, or JSON export produced by this skill:
+
+- **Independently verify** all numerical inputs and outputs against a certified dive computer, redundant decompression planner, or recognized diving agency tables.
+- **Review and confirm** any generated dive plan, bailout plan, or gas-blending recipe with a **certified dive professional, technical diving instructor, or certified gas blender**.
+- **Physically analyze** every breathing gas cylinder with a calibrated oxygen (and helium, where applicable) analyzer and clearly label its Maximum Operating Depth (`MOD`) prior to diving.
+- **Acknowledge inherent risks:** Scuba diving, decompression, altitude diving, and high-pressure gas blending carry inherent risks of decompression sickness (`DCS`), arterial gas embolism (`AGE`), oxygen toxicity, hypoxia, barotrauma, fire/explosion, serious injury, permanent disability, or death. DCS and oxygen toxicity can occur even when strictly following a computed schedule.
+
+All CLI table plans, CLI JSON calculation payloads (`safety_notice`), exported dashboard JSON files, and browser printouts (`Print Plan`) embed a mandatory verification and assumption-of-risk notice. See [`NOTICE`](NOTICE) and [`legal/terms.md`](legal/terms.md) (`DRAFT — REQUIRES LEGAL REVIEW`) for full details.
+
+---
+
+## 6. License
+
+This project is licensed under the **Apache License, Version 2.0**. See [`LICENSE`](LICENSE) and the companion Apache License 2.0 Section 4(d) [`NOTICE`](NOTICE) file for details. Provided **"AS IS"**, without warranties or conditions of any kind, and subject to the limitation of liability in Apache License 2.0 Sections 7 and 8.
