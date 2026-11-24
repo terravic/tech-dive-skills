@@ -1,6 +1,6 @@
 # Product Requirements Document (PRD): Technical Scuba Dive Planner Skill (`tech-dive-planner`)
 
-**Version:** 2.3  
+**Version:** 2.4  
 **Skill Identifier:** `tech-dive-planner`  
 **Primary Instruction File:** `SKILL.md`  
 **Design Specification:** `DESIGN.md`  
@@ -119,6 +119,7 @@ All project files are organized using relative paths from the repository root:
 |-- LICENSE
 |-- PRD.md
 |-- README.md
+|-- SECURITY_AUDIT.md
 |-- SKILL.md
 |-- dashboard.html
 |-- requirements.txt
@@ -128,6 +129,11 @@ All project files are organized using relative paths from the repository root:
 |   `-- synthetic_dive_profiles.json
 |-- documents/
 |   `-- prd.md
+|-- legal/
+|   |-- cookies.md
+|   |-- privacy.md
+|   |-- refunds.md
+|   `-- terms.md
 |-- references/
 |   `-- zhl16c_math_reference.md
 |-- scripts/
@@ -285,19 +291,20 @@ $$GF\left(D_{\text{next}}\right) = GF_{\text{low}} + \left(GF_{\text{high}} - GF
 
 #### G. Interactive HTML Dashboard & Two-Tab Primary Workspace Architecture (`dashboard.html`)
 - **Design Specification (`DESIGN.md`)**:
-  - **Typography**: `DM Sans` (UI controls and labels), `Instrument Serif` (display titles), and `IBM Plex Mono` with `tabular-nums` (telemetry tables, matrices, and numerical inputs).
-  - **Theme Modes (`light`, `dark`, `system`)**: Three-button segmented theme switcher (`#theme-btn-light`, `#theme-btn-dark`, `#theme-btn-system`) persisted in `localStorage` with real-time OS `prefers-color-scheme: dark` tracking.
-  - **Surface Tokens**: Light mode (`#FAFAF9` background, `#FFFFFF` cards, `#E7E5E4` borders, `#1C1917` primary text, `#787774` secondary text) and Dark mode (`#0D0E11` background, `#16171D` cards, `#292A30` borders, `#ECE8E2` primary text, `#9A9895` secondary text).
-  - **Semantic Visualization Palette**: Vibrant Teal (`#0D9488`), Energetic Amber (`#D97706`), Vivid Indigo (`#4F46E5`), Functional Emerald (`#059669`), and Deep Rose (`#E11D48`).
+  - **Typography**: `DM Sans` (`system-ui`, `sans-serif`), `Instrument Serif` (`Georgia`, `serif`), and `IBM Plex Mono` (`monospace`) with `tabular-nums` for telemetry tables, matrices, and numerical inputs, resolved locally without external font requests.
+  - **Theme Modes (`light`, `dark`, `system`)**: Three-button text-labeled theme switcher (`#theme-btn-light`, `#theme-btn-dark`, `#theme-btn-system`) persisted in `localStorage` with real-time OS `prefers-color-scheme: dark` tracking.
+  - **Surface, Divider, and WCAG 2.2 AA Contrast Tokens**: Light mode (`#FAFAF9` background, `#FFFFFF` cards, `#E7E5E4` dividers, `#787774` interactive control borders, `#1C1917` primary text, `#57534E` secondary text) and Dark mode (`#0D0E11` background, `#16171D` cards, `#292A30` dividers, `#6E707A` interactive control borders, `#ECE8E2` primary text, `#9A9895` secondary text), paired with AA foreground/button tokens (>= 4.5:1 text contrast, >= 3.0:1 UI control contrast).
+  - **Semantic Visualization Palette**: Vibrant Teal (`#0D9488`), Energetic Amber (`#D97706`), Vivid Indigo (`#4F46E5`), Functional Emerald (`#059669`), and Deep Rose (`#E11D48`), always accompanied by explicit bracketed text status tags (`[NOMINAL]`, `[DECO REQUIRED]`, `[CAUTION]`, `[CRITICAL]`, `[OK]`, `[OVER GF]`).
 - **Primary Workspace Navigation Bar (`.workspace-tabs`)**:
-  - **Main Tab 1 (`1. Dive Planner` / `#main-view-planner`, active by default)**: Displays the 4-Card KPI Telemetry Summary Strip (`Total Runtime (TTS)`, `Max Depth & Leading Tissue`, `Oxygen Toxicity (CNS / OTU)`, `Peak Gas Density & END`) and the 2-column Bento grid:
-    - **Left Configuration Column (`380px`)**: Card 1 (`Bottom Profile & Best-Gas Solver` with `New Profile`, `Save Profile`, target depth/time, and `Auto Best Gas + Plan`), Card 2 (`ZH-L16C & Gradient Factors`), Card 3 (`Stops, Kinematics & RMV / Altitude`), and Card 4 (`Gas Mixes & Bailout Inventory`).
-    - **Right Telemetry Column (`1fr`)**: Card R1 (`Interactive Depth, Decompression Ceiling & Gas Switch Profile` dual Y-axis SVG chart with left depth axis, right `PO2 (ATA)` axis, and interactive hover crosshair tooltip `#chart-hover-tooltip`) and Card R2 (`Ascent & Decompression Table`, `Cylinder Gas Logistics`, and `16-Compartment Tissue Matrix` sub-tabs).
-  - **Main Tab 2 (`2. Diver Utility Tools` / `#main-view-tools`)**: Displays the full-width `Diver Utility Tools & Query Variants Suite` card on a single screen with four sub-tabs:
-    1. `Tool 1 & Var 2: EAD / END / MOD & Tank Max-Depth` (`#util-tab-mod`)
-    2. `Tool 2: Best Mix for Depth` (`#util-tab-bestmix`)
-    3. `Tool 3: Nitrox / Trimix Blender & Fill Capacity` (`#util-tab-blender`)
-    4. `Tool 4 & Var 3: Gas Density, Rock Bottom & What-If` (`#util-tab-density`)
+  - **Main Tab 1 (`Dive Planner` / `#main-view-planner`, active by default)**:
+    - **Top 2x2 Configuration Grid (`.planner-inputs-grid`)**: `Dive Profile` (profile naming, `New`, `Save`, target depth/time, `Auto Best Gas`, `Calculate Plan`), `Gas Mixes` (interactive cylinder/mix table), `Gradient Factors & Algorithm` (GF presets, `GF Low`/`GF High`, Compartment `1b`/`1`, `O2 Narcosis`, CCR setpoints), and `Stops, Rates & RMV` (stop step, last OC/CCR stop, stop quantum, RMV, kinematic rates, site elevation).
+    - **Bottom Output Stack (`.planner-outputs-stack`)**: 4-Card KPI Summary Strip (`Total Runtime (TTS)`, `Max Depth & Leading Tissue`, `Oxygen Toxicity (CNS / OTU)`, `Peak Gas Density & END`), `Depth & Decompression Ceiling` dual Y-axis SVG chart with mouse hover and keyboard scrubbing (`#chart-hover-tooltip`), and tabbed outputs (`Decompression Schedule`, `Cylinder Gas`, `Tissue Compartments` with `role="progressbar"` loading indicators).
+  - **Main Tab 2 (`Diver Tools` / `#main-view-tools`)**: Displays the full-width Diver Utility Calculators card with four WAI-ARIA tabs:
+    1. `EAD / END / MOD & Max Depth` (`#util-tab-mod`)
+    2. `Best Mix` (`#util-tab-bestmix`)
+    3. `Gas Blender` (`#util-tab-blender`)
+    4. `Gas Density & Rock Bottom` (`#util-tab-density`)
+- **Profile Persistence & Erasure Controls**: Top navigation bar supports `New`, `Save`, `Delete`, `Export` (machine-readable JSON), `Import` (1 MB size-capped, schema-validated, prototype-pollution-safe JSON), and `Clear Local Data` (`clearAllLocalData()`).
 
 ---
 
@@ -307,12 +314,15 @@ $$GF\left(D_{\text{next}}\right) = GF_{\text{low}} + \left(GF_{\text{high}} - GF
    - Single dive plan or utility CLI calculation completes in under $100\text{ ms}$ on standard hardware.
    - Multi-scenario `what-if` or `max-depth` envelope sweeps complete in under $500\text{ ms}$.
    - Interactive UI recalculations inside `dashboard.html` complete in under $15\text{ ms}$ per input change without resetting scroll position or active tab state.
-2. **Data Privacy and Offline Execution:**
+2. **Data Privacy, Security, and Offline Execution:**
    - All reference and benchmark profiles (`assets/synthetic_dive_profiles.json`) contain only technical dive parameters and gas configurations.
    - Neither `scripts/zhl16c_planner.py`, `scripts/build_dashboard.py`, nor `dashboard.html` performs external network requests or remote telemetry transmissions.
-3. **Portability and Relative Path Architecture:**
+   - `dashboard.html` enforces `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; ... connect-src 'none'; ...">`, `<meta name="referrer" content="no-referrer" />`, Unicode-escaped JSON embedding, HTML escaping across all dynamic DOM updates, and strict client-side validation of imported JSON files.
+3. **Accessibility (WCAG 2.2 AA):**
+   - `dashboard.html` provides semantic landmarks (`<header>`, `<nav>`, `<main>`, `<footer>`), single-`<h1>` heading structure, a skip-to-main-content link, `:focus-visible` focus rings, full keyboard navigation across tablists and the SVG chart, accessible labels for all static and dynamic inputs, and text-explicit status cues alongside color coding.
+4. **Portability and Relative Path Architecture:**
    - All file lookups in `scripts/`, `tests/`, and `SKILL.md` resolve relative to the project root directory using `pathlib.Path(__file__).resolve().parent.parent`.
-4. **Algorithmic Completeness:**
+5. **Algorithmic Completeness:**
    - Every function in `scripts/zhl16c_planner.py` and `dashboard.html` executes the full mathematical specification across all 16 compartments and gas transport equations.
 
 ---
@@ -324,9 +334,11 @@ $$GF\left(D_{\text{next}}\right) = GF_{\text{low}} + \left(GF_{\text{high}} - GF
 | `ERR_GAS_FRACTIONS` | $F_{\text{O}_2} \le 0$, $F_{\text{He}} < 0$, or $F_{\text{O}_2} + F_{\text{He}} > 1.0001$ | $0.01 \le F_{\text{O}_2} \le 1.0$, $0.0 \le F_{\text{He}} < 1.0$, $F_{\text{O}_2} + F_{\text{He}} \le 1.0$ | Raises `DivePlannerValidationError` detailing exact gas composition violation (`O2% + He% cannot exceed 100%`). | `2` |
 | `ERR_GF_RANGE` | `gf_low < 1`, `gf_high > 100`, or `gf_low > gf_high` | $1 \le \text{gf\_low} \le \text{gf\_high} \le 100$ | Raises `DivePlannerValidationError` explaining that `GF Low` must be between 1% and `GF High`, and `GF High` $\le 100\%$. | `2` |
 | `ERR_STOP_INTERVAL` | `min_stop_time_sec < 1` or `min_stop_time_sec > 60` | $1\text{ s} \le \text{min\_stop\_time\_sec} \le 60\text{ s}$ | Raises `DivePlannerValidationError` enforcing the $1\text{ second}$ minimum to $1\text{ minute}$ ($60\text{ s}$) maximum stop interval bound. | `2` |
-| `ERR_KINEMATIC_RATE` | `descent_rate <= 0`, `ascent_rate <= 0`, `deco_ascent_rate <= 0`, or `surface_ascent_rate <= 0` | All kinematic rates $> 0$ | Raises `DivePlannerValidationError` specifying which ascent/descent rate is non-positive. | `2` |
-| `ERR_DEPTH_TIME` | Segment `depth < 0`, `depth > 1000 ft`, or `time <= 0` | $0 \le D \le 1000\text{ ft}$ ($305\text{ m}$), $t > 0$ | Raises `DivePlannerValidationError` identifying the invalid segment index and value. | `2` |
-| `ERR_ELEVATION` | `elevation_ft < 0` or `elevation_ft > 15000` | $0 \le E_{\text{ft}} \le 15000\text{ ft}$ | Raises `DivePlannerValidationError` rejecting negative or extreme altitudes. | `2` |
+| `ERR_SETPOINT` | `ccr_setpoint_bottom` or `ccr_setpoint_deco` outside $[0.40, 1.60]$ | $0.40 \le SP \le 1.60$ (finite real number) | Raises `DivePlannerValidationError` rejecting out-of-range CCR loop setpoints. | `2` |
+| `ERR_KINEMATIC_RATE` | `descent_rate <= 0`, `ascent_rate <= 0`, `deco_ascent_rate <= 0`, `surface_ascent_rate <= 0`, or non-finite rate/RMV | All kinematic rates and RMV values finite and $> 0$ | Raises `DivePlannerValidationError` specifying which ascent/descent rate or RMV is invalid. | `2` |
+| `ERR_DEPTH_TIME` | Segment `depth <= 0`, `depth > 1000 ft` (`305 m`), `time <= 0`, or non-finite values | $0 < D \le 1000\text{ ft}$ ($305\text{ m}$), $t > 0$ | Raises `DivePlannerValidationError` identifying the invalid segment index and value. | `2` |
+| `ERR_ELEVATION` | `elevation_ft < 0`, `elevation_ft > 15000`, or non-finite | $0 \le E_{\text{ft}} \le 15000\text{ ft}$ | Raises `DivePlannerValidationError` rejecting negative, non-finite, or extreme altitudes. | `2` |
+| `ERR_UNKNOWN_KEY` | Undefined top-level, segment, or gas object key in JSON input payload | Strict schema allowlist (`additionalProperties: false`) | Raises `DivePlannerValidationError` listing the rejected undefined key(s). | `2` |
 | `ERR_HYPOXIC_SURFACE` | Breathing a hypoxic mix ($P_{\text{O}_2} < 0.16\text{ ATA}$) at shallow depth without an enabled travel gas | $P_{\text{O}_2} \ge 0.16\text{ ATA}$ | Emits explicit `HYPOXIC_WARNING` in plan telemetry and automatically inserts a breathable travel gas if `--auto-best-gas` is enabled. | `0` (with alert) / `2` (if strict) |
 | `ERR_BLEND_IMPOSSIBLE` | Target mix requires negative $\Delta P_{\text{O}_2}$ or negative $\Delta P_{\text{top}}$ (for example, target $\text{O}_2\%$ is lower than top-up gas $\text{O}_2\%$ after adding Helium) | $\Delta P_{\text{He}} \ge 0, \Delta P_{\text{O}_2} \ge 0, \Delta P_{\text{top}} \ge 0$ | Returns structured blending feasibility report explaining why Air top-up cannot produce a hyper-hypoxic oxygen ratio without an inert Argon/Nitrogen bank. | `2` |
-| `ERR_MALFORMED_JSON` | Corrupted or structurally invalid JSON input file passed via `--input-file` | Valid JSON conforming to `assets/dive_plan_schema.json` | Catches `json.JSONDecodeError` / `KeyError`, logs structured error message, and exits cleanly. | `3` |
+| `ERR_MALFORMED_JSON` | Corrupted or structurally invalid JSON input or profile store file | Valid JSON object conforming to `assets/dive_plan_schema.json` | Catches JSON parse errors, emits structured `[ERR_MALFORMED_JSON]` error message, and exits cleanly. | `3` |

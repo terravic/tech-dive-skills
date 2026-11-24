@@ -1,6 +1,6 @@
 # Dashboard Design Specification
 
-This document defines the visual, structural, and technical specifications for standalone interactive HTML dashboards. It applies universally across dashboard views, charting studios, and network visualizations.
+This document defines the visual, structural, accessibility, and technical specifications for the standalone interactive Bühlmann ZH-L16C + Gradient Factors Technical Dive Planner dashboard (`dashboard.html`).
 
 ---
 
@@ -8,91 +8,83 @@ This document defines the visual, structural, and technical specifications for s
 
 | Design Dimension | Specification | Implementation Standard |
 |---|---|---|
-| **Typography** | Distinct typographic hierarchy across prose, headers, and tabular values. | Pair a clean sans-serif UI font (`DM Sans` or `Geist Sans`), a serif display font (`Instrument Serif`), and a tabular monospaced font (`IBM Plex Mono` or `Geist Mono`). Avoid generic defaults such as `Inter` or `Roboto`. |
-| **Surfaces and Depth** | Flat, solid surface tokens with clear structural boundaries. | Use solid background tokens and `1px solid` borders (`6px` to `8px` radius) for separation instead of multi-stop color gradients. |
-| **Container Layout** | Single-level bento-style grid organization. | Partition panes using flat grid cells and thin dividers rather than nested card-in-card containers. |
-| **Status Indicators** | High-signal state reporting. | Highlight warning, error, or critical states explicitly; render nominal items using standard monospaced or muted tokens. |
-| **Background Surfaces** | Uncluttered viewport backgrounds for node maps and workspaces. | Reserve gridlines strictly for quantitative chart axes and coordinate plots. |
-| **Control Surfaces** | Text-first section headers with compact SVG action controls where specified. | Use text hierarchy for card and section titles; restrict SVG symbols to functional interactive controls such as the theme mode selector. |
+| **Typography** | Distinct typographic hierarchy across prose, headers, and tabular telemetry. | Pair a clean sans-serif UI font (`DM Sans`, `system-ui`, `sans-serif`), a serif display font (`Instrument Serif`, `Georgia`, `serif`), and a tabular monospaced font (`IBM Plex Mono`, `monospace`) with `font-variant-numeric: tabular-nums`. Load local/system font stacks without external font network requests. |
+| **Surfaces and Depth** | Flat, solid surface tokens with clear structural boundaries. | Use solid background tokens and `1px solid` borders (`6px` to `8px` radius) for card separation instead of decorative multi-stop card gradients. |
+| **Container Layout** | Responsive 2x2 configuration grid paired with a stacked telemetry output region. | Partition configuration panes (`Dive Profile`, `Gas Mixes`, `Gradient Factors & Algorithm`, `Stops, Rates & RMV`) in `.planner-inputs-grid` above the KPI strip, profile chart, and schedule tables in `.planner-outputs-stack`. |
+| **Status Indicators** | Text-explicit state reporting compliant with WCAG 2.2 AA. | Pair color cues with explicit bracketed text tags (`[NOMINAL]`, `[DECO REQUIRED]`, `[CAUTION >80%]`, `[CRITICAL >100%]`, `[OK]`, `[OVER GF]`) rather than relying on color alone or decorative icons. |
+| **Background Surfaces** | Uncluttered viewport backgrounds across planner and utility workspaces. | Reserve dashed gridlines strictly for the quantitative dual Y-axis dive profile chart (`Depth` and `PO2 (ATA)`). |
+| **Control Surfaces** | Text-first section headers, form labels, and segmented controls. | Use explicit text labels on all interactive controls, including the Light/Dark/System theme selector, OC/CCR toggle, unit toggle, and workspace tabs. |
 
 ---
 
 ## 2. Runtime Environment and Technical Architecture
 
-* **Self-Contained Execution:** Dashboards must run inside standard browsers as well as sandboxed or embedded webviews using standard HTML5, CSS custom properties, and JavaScript.
-* **Dynamic State Updates:** UI components must support incremental state updates and live data refresh without resetting user viewport state, scroll position, or active chart/camera interactions.
-* **Standalone Output (`dashboard.html`):** Build workflows emit a self-contained `dashboard.html` file at the project root (or active workspace directory) that can be opened directly from disk or served over HTTP with Server-Sent Events (SSE).
-* **Empirical Data Rendering:** Views must render the actual computed dataset, provenance records, and telemetry events from the active workspace.
+* **Self-Contained Offline Execution:** `dashboard.html` runs directly from local disk (`file://`) or any static webview using standard HTML5, CSS custom properties, SVG, and vanilla JavaScript with zero external network requests.
+* **Content Security Policy:** The document head enforces a strict offline `<meta http-equiv="Content-Security-Policy">` (`default-src 'none'; connect-src 'none'; img-src 'none'; font-src 'self' data:`) and `<meta name="referrer" content="no-referrer" />`.
+* **Dynamic State Updates:** Client-side recalculation via the embedded Bühlmann ZH-L16C + Gradient Factors solver updates KPI cards, the dual Y-axis SVG profile chart, tables, and utility calculators without resetting scroll position or active tab selection.
+* **Local Persistence and Data Controls:** Custom profiles (`zhl16c-custom-profiles`) and theme mode (`theme-preference`) persist exclusively in browser `localStorage`, with JSON `Export`, validated JSON `Import`, per-profile `Delete`, and single-action `Clear Local Data`.
 
 ---
 
 ## 3. Light, Dark, and System Theme Specifications
 
-The dashboard must natively support a clean light mode, a high-contrast dark mode, and an automatic system mode that follows the operating system appearance preference.
+The dashboard natively supports Light Mode, Dark Mode, and System Mode tracking the operating system color-scheme preference.
 
-* **Three-Button Theme Selector:** The theme switcher in the top navigation bar is a compact segmented control consisting of three textless, minimalist SVG symbol buttons placed side by side:
-  * **Light Mode (`#theme-btn-light`):** Sun SVG symbol (`title="Light Theme"`, `aria-label="Light Theme"`, `data-theme-mode="light"`).
-  * **Dark Mode (`#theme-btn-dark`):** Crescent moon SVG symbol (`title="Dark Theme"`, `aria-label="Dark Theme"`, `data-theme-mode="dark"`).
-  * **System Mode (`#theme-btn-system`):** Simple computer monitor SVG symbol (`title="System Theme"`, `aria-label="System Theme"`, `data-theme-mode="system"`).
-  * Each button contains only its SVG symbol, highlights the active mode via the `active` class and `aria-pressed="true"`, and persists the selected mode (`light`, `dark`, or `system`) in `localStorage`.
-* **Cross-Platform System Theme Detection:**
-  * **Browser / Webview Layer:** When `system` mode is selected, resolve the active theme via `window.matchMedia('(prefers-color-scheme: dark)')` and register a `'change'` listener so operating system appearance changes update the interface in real time.
-  * **Host OS Layer (Backend Fallback):** When generated by a local CLI or plugin running on the host operating system, query the native OS preference and embed `system_theme` in the data bundle as a fallback for headless or restricted webviews.
-* **Color Schemes:**
+* **Three-Button Theme Selector:** The theme switcher in the top navigation bar is a segmented control containing three text-labeled buttons:
+  * **Light Mode (`#theme-btn-light`):** Text label `Light` (`title="Light Theme"`, `aria-label="Light Theme"`, `data-theme-mode="light"`).
+  * **Dark Mode (`#theme-btn-dark`):** Text label `Dark` (`title="Dark Theme"`, `aria-label="Dark Theme"`, `data-theme-mode="dark"`).
+  * **System Mode (`#theme-btn-system`):** Text label `System` (`title="System Theme"`, `aria-label="System Theme"`, `data-theme-mode="system"`).
+  * The active button receives the `active` class and `aria-pressed="true"`, and persists `theme-preference` (`light`, `dark`, or `system`) in `localStorage`.
+* **System Theme Detection:** When `system` mode is active, `window.matchMedia('(prefers-color-scheme: dark)')` resolves the effective theme and listens for `'change'` events to track OS appearance updates in real time.
+* **Surface, Divider, and WCAG 2.2 AA Contrast Tokens:**
   * **Light Mode:**
-    * Background: `#FAFAF9` (Warm off-white)
-    * Cards & Surfaces: `#FFFFFF`
-    * Borders: `#E7E5E4` (`1px solid`, `6px` to `8px` border-radius)
-    * Text Primary: `#1C1917`
-    * Text Secondary: `#787774`
+    * Background (`--bg-surface`): `#FAFAF9`
+    * Cards & Surfaces (`--bg-card`): `#FFFFFF`
+    * Subtle Fill (`--bg-subtle`): `#F5F5F4`
+    * Card Dividers (`--border-color`): `#E7E5E4` (`1px solid`, `6px` to `8px` radius)
+    * Interactive Control Borders (`--border-control`): `#787774` (>= 4.1:1 UI contrast)
+    * Text Primary (`--text-primary`): `#1C1917` (>= 16.7:1 contrast)
+    * Text Secondary (`--text-secondary`): `#57534E` (>= 6.9:1 contrast)
+    * AA Accent/Status Foregrounds: `#0F766E` (Teal, 5.47:1), `#B45309` (Amber, 5.02:1), `#4338CA` (Indigo, 7.65:1), `#047857` (Emerald, 5.48:1), `#BE123C` (Rose, 6.29:1)
   * **Dark Mode:**
-    * Background: `#0D0E11` (Deep charcoal)
-    * Cards & Surfaces: `#16171D`
-    * Borders: `#292A30` (`1px solid`, `6px` to `8px` border-radius)
-    * Text Primary: `#ECE8E2`
-    * Text Secondary: `#9A9895`
+    * Background (`--bg-surface`): `#0D0E11`
+    * Cards & Surfaces (`--bg-card`): `#16171D`
+    * Subtle Fill (`--bg-subtle`): `#1E2028`
+    * Card Dividers (`--border-color`): `#292A30` (`1px solid`, `6px` to `8px` radius)
+    * Interactive Control Borders (`--border-control`): `#6E707A` (>= 3.6:1 UI contrast)
+    * Text Primary (`--text-primary`): `#ECE8E2` (>= 14.6:1 contrast)
+    * Text Secondary (`--text-secondary`): `#9A9895` (>= 5.6:1 contrast)
+    * AA Accent/Status Foregrounds: `#2DD4BF` (Teal, 9.61:1), `#F59E0B` (Amber, 8.33:1), `#818CF8` (Indigo, 5.99:1), `#34D399` (Emerald, 9.30:1), `#FB7185` (Rose, 6.64:1)
 
 ---
 
-## 4. Dashboard Layout and Component Rules
+## 4. Dashboard Layout, Accessibility, and Component Rules
 
-All dashboard views balance information density with scannable layout structure and concise component titles.
-
-* **Section Headings:** Keep component headers concise and descriptive of the underlying data domain.
-* **Tables:** Render numerical and tabular data in a monospaced font (`IBM Plex Mono` or `Geist Mono`) with `font-variant-numeric: tabular-nums` and thin horizontal row dividers.
-* **3D and Network Visualizations:**
-  * Use interactive 3D molecular or structural views where spatial geometry directly informs analysis, paired with a software projection fallback when hardware WebGL is unavailable.
-  * Use clear, domain-accurate component titles such as "Interactive Relationship Node Map" and "Structural Data Diagram."
-  * Keep layout and edge calculations deterministic and fast to maintain responsive pan and zoom performance.
+* **Semantic Landmarks and Heading Hierarchy:** Enforce `<header>`, `<nav>`, `<main id="main-content">`, and `<footer class="site-footer">` with a single `<h1>` title and logical `<h2>` card headings.
+* **Keyboard Navigation and Focus Management:** Provide a `Skip to main content` link, high-contrast `:focus-visible` outlines on all interactive controls, WAI-ARIA `tablist`/`tab`/`tabpanel` arrow-key navigation across workspace/schedule/utility tabs, and keyboard scrubbing (`ArrowLeft`, `ArrowRight`, `Home`, `End`, `Escape`) on the dive profile SVG chart.
+* **Tables:** Render decompression stops, cylinder gas logistics, 16-compartment tissue tensions, and utility outputs in monospaced tabular numerals (`IBM Plex Mono`, `tabular-nums`) with `<th scope="col">` column headers.
+* **Dual Y-Axis Dive Profile Chart:** Plot actual depth, Gradient Factor decompression ceiling, decompression stop markers, and inspired `PO2 (ATA)` deterministically in inline SVG with mouse hover and keyboard crosshair telemetry inspection (`#chart-hover-tooltip`).
 
 ---
 
-## 5. Dynamic Data Visualization and Color Palette
+## 5. Data Visualization Color Palette
 
-While container surfaces remain neutral and structured, charts, heatmaps, and network/molecular graphs use a high-contrast semantic color palette against both light and dark backgrounds:
-
-### Data Visualization Color Palette
+Charts and tissue loading indicators use a consistent semantic color palette paired with high-contrast text tokens in both themes:
 
 | Color Role | Hex Code | Visual Application |
 |---|---|---|
-| **Vibrant Teal** | `#0D9488` | Primary data series, baseline metrics, structural bonds, nominal nodes. |
-| **Energetic Amber** | `#D97706` | Secondary data series, warning thresholds, intermediate intensity. |
-| **Vivid Indigo** | `#4F46E5` | Comparison series, distinct molecular groups, specialized network nodes. |
-| **Functional Emerald** | `#059669` | Passing metrics, positive outcomes, validated states. |
-| **Deep Rose** | `#E11D48` | Critical alerts, negative trends, threshold violations. |
-
-### Visualization Guidelines
-
-* **Matrices and Heatmaps:** Transition smoothly from the surface background tone through **Vibrant Teal** (`#0D9488`) and **Vivid Indigo** (`#4F46E5`) to **Deep Rose** (`#E11D48`) so concentration gradients are legible in both themes.
-* **Network and Molecular Graphs:** Color nodes by category or validation state using the semantic palette above, with semi-transparent edge strokes derived from the connected node state.
-* **Chart Backgrounds and Gridlines:** Keep chart plot backgrounds transparent so they inherit the active light or dark surface color, and use subtle axis gridlines (`#E7E5E4` in light mode, `#292A30` in dark mode).
+| **Vibrant Teal** | `#0D9488` | Actual dive depth profile path, nominal tissue loading fill. |
+| **Energetic Amber** | `#D97706` | Decompression stop markers, elevated tissue loading warning fill. |
+| **Vivid Indigo** | `#4F46E5` | Inspired `PO2 (ATA)` secondary series path. |
+| **Functional Emerald** | `#059669` | Nominal physiological and reserve status graphics. |
+| **Deep Rose** | `#E11D48` | Gradient Factor decompression ceiling path, critical threshold fill. |
 
 ---
 
 ## 6. Verification Checklist
 
-1. Does the build produce a self-contained `dashboard.html` file that renders both offline and via live SSE streaming?
-2. Does the theme selector present the three side-by-side SVG buttons (Sun for Light, Moon for Dark, Computer Monitor for System) with real-time OS theme tracking?
-3. Do both Light Mode and Dark Mode apply the exact surface, border, and text hex tokens specified in Section 3?
-4. Do all 2D charts, 3D molecular views, and SVG node maps apply the semantic data visualization palette from Section 5 and re-render cleanly when switching themes?
-5. Does the dashboard display the live workspace data, provenance citations, and validation records without placeholder text?
+1. Does `scripts/build_dashboard.py` produce a self-contained offline `dashboard.html` enforcing CSP `default-src 'none'; connect-src 'none'` with zero external network or font calls?
+2. Does the theme selector render the three text-labeled buttons (`#theme-btn-light`, `#theme-btn-dark`, `#theme-btn-system`) with real-time OS `prefers-color-scheme: dark` tracking?
+3. Do Light Mode and Dark Mode satisfy WCAG 2.2 AA contrast ratios (>= 4.5:1 normal text, >= 3.0:1 UI control borders) across default, hover, and `:focus-visible` states?
+4. Are all dynamic DOM insertions HTML-escaped and imported JSON profiles validated against size, schema, and unsafe object keys?
+5. Are all workspace tabs, tables, form inputs, tissue progress bars, and the SVG profile chart fully keyboard-accessible with explicit textual status indicators?

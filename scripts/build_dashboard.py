@@ -56,28 +56,48 @@ def load_precomputed_benchmarks() -> Dict[str, Any]:
 
 def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
     """Returns the complete self-contained HTML string for dashboard.html."""
-    embedded_json = json.dumps(benchmarks, separators=(",", ":"))
+    embedded_json = (
+        json.dumps(benchmarks, separators=(",", ":"))
+        .replace("&", "\\u0026")
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("\u2028", "\\u2028")
+        .replace("\u2029", "\\u2029")
+    )
 
     html_template = """<!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; font-src 'self' data:; img-src 'none'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none';" />
+  <meta name="referrer" content="no-referrer" />
   <title>Bühlmann ZH-L16C + GF Technical Dive Planner &amp; Gas Utility Suite</title>
   <style>
     :root, [data-theme="light"] {
       --bg-surface: #FAFAF9;
       --bg-card: #FFFFFF;
       --bg-subtle: #F5F5F4;
-      --bg-glass: rgba(255, 255, 255, 0.85);
+      --bg-glass: rgba(255, 255, 255, 0.92);
       --text-primary: #1C1917;
-      --text-secondary: #787774;
+      --text-secondary: #57534E;
       --border-color: #E7E5E4;
+      --border-control: #787774;
       --accent-primary: #0D9488;
+      --accent-primary-text: #0F766E;
+      --btn-primary-bg: #0F766E;
+      --btn-primary-text: #FFFFFF;
       --accent-secondary: #D97706;
+      --accent-secondary-text: #B45309;
+      --btn-amber-bg: #B45309;
+      --btn-amber-text: #FFFFFF;
       --accent-tertiary: #4F46E5;
+      --accent-tertiary-text: #4338CA;
       --status-positive: #059669;
+      --status-positive-text: #047857;
       --status-warning: #E11D48;
+      --status-warning-text: #BE123C;
+      --focus-ring: #0F766E;
       --shadow-card: 0 1px 2px rgba(28, 25, 23, 0.04);
       --font-sans: 'DM Sans', system-ui, sans-serif;
       --font-serif: 'Instrument Serif', Georgia, serif;
@@ -88,15 +108,26 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       --bg-surface: #0D0E11;
       --bg-card: #16171D;
       --bg-subtle: #1E2028;
-      --bg-glass: rgba(22, 23, 29, 0.85);
+      --bg-glass: rgba(22, 23, 29, 0.92);
       --text-primary: #ECE8E2;
       --text-secondary: #9A9895;
       --border-color: #292A30;
+      --border-control: #6E707A;
       --accent-primary: #0D9488;
+      --accent-primary-text: #2DD4BF;
+      --btn-primary-bg: #14B8A6;
+      --btn-primary-text: #0D0E11;
       --accent-secondary: #D97706;
+      --accent-secondary-text: #F59E0B;
+      --btn-amber-bg: #F59E0B;
+      --btn-amber-text: #0D0E11;
       --accent-tertiary: #4F46E5;
+      --accent-tertiary-text: #818CF8;
       --status-positive: #059669;
+      --status-positive-text: #34D399;
       --status-warning: #E11D48;
+      --status-warning-text: #FB7185;
+      --focus-ring: #2DD4BF;
       --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.35);
     }
 
@@ -104,6 +135,40 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       box-sizing: border-box;
       margin: 0;
       padding: 0;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .skip-link {
+      position: absolute;
+      left: -9999px;
+      top: 8px;
+      z-index: 200;
+      padding: 8px 14px;
+      background: var(--btn-primary-bg);
+      color: var(--btn-primary-text);
+      border-radius: 6px;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .skip-link:focus {
+      left: 12px;
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--focus-ring);
+      outline-offset: 2px;
     }
 
     body {
@@ -167,9 +232,9 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       letter-spacing: 0.06em;
       padding: 3px 8px;
       border-radius: 4px;
-      border: 1px solid var(--border-color);
+      border: 1px solid var(--border-control);
       background: var(--bg-card);
-      color: var(--accent-primary);
+      color: var(--accent-primary-text);
     }
 
     .navbar-controls {
@@ -183,7 +248,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       display: inline-flex;
       align-items: center;
       background: var(--bg-subtle);
-      border: 1px solid var(--border-color);
+      border: 1px solid var(--border-control);
       border-radius: 9999px;
       padding: 3px;
       gap: 2px;
@@ -202,6 +267,10 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       transition: all 0.15s ease;
     }
 
+    .segmented-pill button:hover {
+      color: var(--text-primary);
+    }
+
     .segmented-pill button.active {
       background: var(--bg-card);
       color: var(--text-primary);
@@ -213,7 +282,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       display: inline-flex;
       align-items: center;
       background: var(--bg-subtle);
-      border: 1px solid var(--border-color);
+      border: 1px solid var(--border-control);
       border-radius: 9999px;
       padding: 3px;
       gap: 2px;
@@ -223,12 +292,14 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 28px;
-      height: 28px;
+      padding: 5px 10px;
       border: none;
       border-radius: 9999px;
       background: transparent;
       color: var(--text-secondary);
+      font-family: var(--font-sans);
+      font-size: 0.76rem;
+      font-weight: 600;
       cursor: pointer;
       transition: all 0.15s ease;
     }
@@ -311,22 +382,22 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       letter-spacing: 0.05em;
       padding: 2px 7px;
       border-radius: 4px;
-      border: 1px solid var(--border-color);
+      border: 1px solid var(--border-control);
     }
 
     .status-nominal {
-      color: var(--status-positive);
-      border-color: var(--status-positive);
+      color: var(--status-positive-text);
+      border-color: var(--status-positive-text);
     }
 
     .status-caution {
-      color: var(--accent-secondary);
-      border-color: var(--accent-secondary);
+      color: var(--accent-secondary-text);
+      border-color: var(--accent-secondary-text);
     }
 
     .status-critical {
-      color: var(--status-warning);
-      border-color: var(--status-warning);
+      color: var(--status-warning-text);
+      border-color: var(--status-warning-text);
     }
 
     .kpi-value {
@@ -424,16 +495,15 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       width: 100%;
       padding: 7px 10px;
       border-radius: 6px;
-      border: 1px solid var(--border-color);
+      border: 1px solid var(--border-control);
       background: var(--bg-surface);
       color: var(--text-primary);
       font-size: 0.875rem;
-      outline: none;
       transition: border-color 0.15s ease;
     }
 
     input[type="number"]:focus, input[type="text"]:focus, select:focus {
-      border-color: var(--accent-primary);
+      border-color: var(--focus-ring);
     }
 
     .btn {
@@ -443,7 +513,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       gap: 6px;
       padding: 8px 14px;
       border-radius: 6px;
-      border: 1px solid var(--border-color);
+      border: 1px solid var(--border-control);
       background: var(--bg-subtle);
       color: var(--text-primary);
       font-family: var(--font-sans);
@@ -454,13 +524,13 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
     }
 
     .btn:hover {
-      border-color: var(--accent-primary);
+      border-color: var(--accent-primary-text);
     }
 
     .btn-primary {
-      background: var(--accent-primary);
-      border-color: var(--accent-primary);
-      color: #FFFFFF;
+      background: var(--btn-primary-bg);
+      border-color: var(--btn-primary-bg);
+      color: var(--btn-primary-text);
     }
 
     .btn-primary:hover {
@@ -468,9 +538,13 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
     }
 
     .btn-amber {
-      background: var(--accent-secondary);
-      border-color: var(--accent-secondary);
-      color: #FFFFFF;
+      background: var(--btn-amber-bg);
+      border-color: var(--btn-amber-bg);
+      color: var(--btn-amber-text);
+    }
+
+    .btn-amber:hover {
+      opacity: 0.92;
     }
 
     .btn-sm {
@@ -530,7 +604,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       height: 320px;
       position: relative;
       background: var(--bg-surface);
-      border: 1px solid var(--border-color);
+      border: 1px solid var(--border-control);
       border-radius: 6px;
       padding: 12px;
     }
@@ -540,7 +614,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       pointer-events: none;
       z-index: 25;
       background: var(--bg-card);
-      border: 1px solid var(--border-color);
+      border: 1px solid var(--border-control);
       border-radius: 6px;
       padding: 10px 12px;
       box-shadow: var(--shadow-card);
@@ -586,7 +660,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       font-size: 0.78rem;
       padding: 8px 12px;
       border-radius: 6px;
-      border-left: 3px solid var(--status-warning);
+      border-left: 3px solid var(--status-warning-text);
       background: var(--bg-subtle);
       color: var(--text-primary);
     }
@@ -606,7 +680,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
     .workspace-tab-btn {
       padding: 9px 18px;
       border-radius: 6px;
-      border: 1px solid var(--border-color);
+      border: 1px solid var(--border-control);
       background: var(--bg-surface);
       color: var(--text-secondary);
       font-family: var(--font-sans);
@@ -617,14 +691,14 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
     }
 
     .workspace-tab-btn:hover {
-      border-color: var(--accent-primary);
+      border-color: var(--accent-primary-text);
       color: var(--text-primary);
     }
 
     .workspace-tab-btn.active {
-      background: var(--accent-primary);
-      border-color: var(--accent-primary);
-      color: #FFFFFF;
+      background: var(--btn-primary-bg);
+      border-color: var(--btn-primary-bg);
+      color: var(--btn-primary-text);
     }
 
     .workspace-view {
@@ -648,7 +722,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
     .tab-btn {
       padding: 6px 13px;
       border-radius: 6px;
-      border: 1px solid var(--border-color);
+      border: 1px solid var(--border-control);
       background: var(--bg-surface);
       color: var(--text-secondary);
       font-size: 0.8rem;
@@ -656,10 +730,15 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       cursor: pointer;
     }
 
+    .tab-btn:hover {
+      color: var(--text-primary);
+      border-color: var(--accent-primary-text);
+    }
+
     .tab-btn.active {
-      background: var(--accent-primary);
-      border-color: var(--accent-primary);
-      color: #FFFFFF;
+      background: var(--btn-primary-bg);
+      border-color: var(--btn-primary-bg);
+      color: var(--btn-primary-text);
     }
 
     .tab-panel {
@@ -670,22 +749,43 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       display: block;
     }
 
+    .progress-bar-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 190px;
+    }
+
     .progress-bar-track {
-      width: 100%;
-      height: 7px;
+      flex: 1;
+      height: 8px;
       background: var(--bg-subtle);
       border-radius: 4px;
       overflow: hidden;
-      border: 1px solid var(--border-color);
+      border: 1px solid var(--border-control);
     }
 
     .progress-bar-fill {
       height: 100%;
       transition: width 0.2s ease;
     }
+
+    .site-footer {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 16px 24px 28px;
+      border-top: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      font-size: 0.78rem;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
   </style>
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
 
   <!-- Sticky Top Navigation Bar -->
   <header class="top-navbar">
@@ -705,45 +805,40 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
           <button type="button" id="btn-delete-profile" class="btn btn-sm" title="Delete selected profile" onclick="deleteSelectedProfileFromBrowser()">Delete</button>
           <button type="button" id="btn-export-profiles" class="btn btn-sm" title="Export profiles" onclick="exportProfilesJson()">Export</button>
           <button type="button" id="btn-import-profiles" class="btn btn-sm" title="Import profiles" onclick="document.getElementById('input-import-file').click()">Import</button>
-          <input type="file" id="input-import-file" accept=".json" style="display:none;" onchange="importProfilesJson(event)" />
+          <button type="button" id="btn-clear-local-data" class="btn btn-sm" title="Clear all locally saved profiles and preferences" onclick="clearAllLocalData()">Clear Local Data</button>
+          <input type="file" id="input-import-file" aria-label="Import dive profiles JSON file" accept=".json" style="display:none;" onchange="importProfilesJson(event)" />
         </div>
 
         <!-- OC / CCR Mode Toggle -->
         <div class="segmented-pill" role="group" aria-label="Circuit Mode">
-          <button type="button" id="mode-btn-oc" class="active" onclick="setDiveMode('OC')">OC</button>
-          <button type="button" id="mode-btn-ccr" onclick="setDiveMode('CCR')">CCR</button>
+          <button type="button" id="mode-btn-oc" class="active" aria-pressed="true" onclick="setDiveMode('OC')">OC</button>
+          <button type="button" id="mode-btn-ccr" aria-pressed="false" onclick="setDiveMode('CCR')">CCR</button>
         </div>
 
         <!-- Depth Units Toggle -->
         <div class="segmented-pill" role="group" aria-label="Depth Units">
-          <button type="button" id="unit-btn-feet" class="active" onclick="setDepthUnits('feet')">FT / CUFT</button>
-          <button type="button" id="unit-btn-meters" onclick="setDepthUnits('meters')">M / LITERS</button>
+          <button type="button" id="unit-btn-feet" class="active" aria-pressed="true" onclick="setDepthUnits('feet')">FT / CUFT</button>
+          <button type="button" id="unit-btn-meters" aria-pressed="false" onclick="setDepthUnits('meters')">M / LITERS</button>
         </div>
 
         <!-- Theme Mode Switcher (Light, Dark, System) -->
         <div class="theme-switcher" role="group" aria-label="Theme Switcher">
-          <button type="button" id="theme-btn-light" class="theme-btn active" title="Light Theme" aria-label="Light Theme" data-theme-mode="light" aria-pressed="true" onclick="setThemeMode('light')">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-          </button>
-          <button type="button" id="theme-btn-dark" class="theme-btn" title="Dark Theme" aria-label="Dark Theme" data-theme-mode="dark" aria-pressed="false" onclick="setThemeMode('dark')">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-          </button>
-          <button type="button" id="theme-btn-system" class="theme-btn" title="System Theme" aria-label="System Theme" data-theme-mode="system" aria-pressed="false" onclick="setThemeMode('system')">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
-          </button>
+          <button type="button" id="theme-btn-light" class="theme-btn active" title="Light Theme" aria-label="Light Theme" data-theme-mode="light" aria-pressed="true" onclick="setThemeMode('light')">Light</button>
+          <button type="button" id="theme-btn-dark" class="theme-btn" title="Dark Theme" aria-label="Dark Theme" data-theme-mode="dark" aria-pressed="false" onclick="setThemeMode('dark')">Dark</button>
+          <button type="button" id="theme-btn-system" class="theme-btn" title="System Theme" aria-label="System Theme" data-theme-mode="system" aria-pressed="false" onclick="setThemeMode('system')">System</button>
         </div>
       </div>
     </div>
   </header>
 
   <!-- Main Workspace Container -->
-  <main class="workspace-container">
+  <main id="main-content" class="workspace-container" tabindex="-1">
 
     <!-- Primary Two-Tab Workspace Selector -->
-    <nav class="workspace-tabs" role="tablist" aria-label="Main Dashboard Mode">
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button type="button" id="main-tab-btn-planner" class="workspace-tab-btn active" role="tab" aria-selected="true" aria-controls="main-view-planner" onclick="switchMainWorkspaceTab('main-view-planner', this)">Dive Planner</button>
-        <button type="button" id="main-tab-btn-tools" class="workspace-tab-btn" role="tab" aria-selected="false" aria-controls="main-view-tools" onclick="switchMainWorkspaceTab('main-view-tools', this)">Diver Tools</button>
+    <nav class="workspace-tabs" aria-label="Main Dashboard Navigation">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;" role="tablist" aria-label="Main Dashboard Mode" onkeydown="handleTablistKeydown(event)">
+        <button type="button" id="main-tab-btn-planner" class="workspace-tab-btn active" role="tab" aria-selected="true" aria-controls="main-view-planner" tabindex="0" onclick="switchMainWorkspaceTab('main-view-planner', this)">Dive Planner</button>
+        <button type="button" id="main-tab-btn-tools" class="workspace-tab-btn" role="tab" aria-selected="false" aria-controls="main-view-tools" tabindex="-1" onclick="switchMainWorkspaceTab('main-view-tools', this)">Diver Tools</button>
       </div>
     </nav>
 
@@ -765,7 +860,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
           <div class="field-group" style="margin-bottom:12px;">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
               <label for="input-profile-name">Profile Name</label>
-              <span id="profile-save-status" class="status-badge status-nominal" style="display:none;">SAVED</span>
+              <span id="profile-save-status" class="status-badge status-nominal" role="status" aria-live="polite" style="display:none;">[SAVED]</span>
             </div>
             <div style="display:flex;gap:6px;">
               <input type="text" id="input-profile-name" placeholder="e.g., Wreck 165ft Trimix" value="OC Trimix 18/45 - 180 ft for 25 min" />
@@ -801,13 +896,13 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
             <table id="gas-inventory-table">
               <thead>
                 <tr>
-                  <th>Mix</th>
-                  <th>O2%</th>
-                  <th>He%</th>
-                  <th>Switch</th>
-                  <th>Tank</th>
-                  <th>Use</th>
-                  <th></th>
+                  <th scope="col">Mix</th>
+                  <th scope="col">O2%</th>
+                  <th scope="col">He%</th>
+                  <th scope="col">Switch</th>
+                  <th scope="col">Tank</th>
+                  <th scope="col">Use</th>
+                  <th scope="col">Action</th>
                 </tr>
               </thead>
               <tbody id="gas-inventory-tbody"></tbody>
@@ -821,7 +916,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
             <h2 class="section-title">Gradient Factors &amp; Algorithm</h2>
           </div>
 
-          <div class="preset-pills">
+          <div class="preset-pills" role="group" aria-label="Gradient Factor Presets">
             <button type="button" class="btn btn-sm" onclick="applyGfPreset(20, 80)">GF 20/80</button>
             <button type="button" class="btn btn-sm" onclick="applyGfPreset(30, 70)">GF 30/70</button>
             <button type="button" class="btn btn-sm" onclick="applyGfPreset(30, 85)">GF 30/85</button>
@@ -951,7 +1046,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
           <div class="card kpi-card">
             <div class="kpi-header">
               <span class="kpi-label">Total Runtime (TTS)</span>
-              <span class="status-badge status-nominal" id="kpi-deco-badge">DECO SCHEDULE</span>
+              <span class="status-badge status-nominal" id="kpi-deco-badge">[DECO SCHEDULE]</span>
             </div>
             <div class="kpi-value" id="kpi-tts-val">00:00</div>
             <div class="kpi-sub" id="kpi-deco-sub">Total Deco: 00:00 | First Stop: 0 ft</div>
@@ -960,7 +1055,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
           <div class="card kpi-card">
             <div class="kpi-header">
               <span class="kpi-label">Max Depth &amp; Leading Tissue</span>
-              <span class="status-badge status-nominal" id="kpi-gf-badge">GF 30/85</span>
+              <span class="status-badge status-nominal" id="kpi-gf-badge">[GF 30/85]</span>
             </div>
             <div class="kpi-value" id="kpi-depth-val">150.0 ft</div>
             <div class="kpi-sub" id="kpi-tissue-sub">Leading Comp: #1b | Surf GF: 0.0%</div>
@@ -969,7 +1064,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
           <div class="card kpi-card">
             <div class="kpi-header">
               <span class="kpi-label">Oxygen Toxicity (CNS / OTU)</span>
-              <span class="status-badge status-nominal" id="kpi-oxtox-badge">NOMINAL</span>
+              <span class="status-badge status-nominal" id="kpi-oxtox-badge">[NOMINAL]</span>
             </div>
             <div class="kpi-value" id="kpi-oxtox-val">0.0% / 0</div>
             <div class="kpi-sub" id="kpi-po2-sub">Peak PO2: 1.40 ATA (NOAA Limit: 80% Rec)</div>
@@ -978,7 +1073,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
           <div class="card kpi-card">
             <div class="kpi-header">
               <span class="kpi-label">Peak Gas Density &amp; END</span>
-              <span class="status-badge status-nominal" id="kpi-density-badge">NOMINAL</span>
+              <span class="status-badge status-nominal" id="kpi-density-badge">[NOMINAL]</span>
             </div>
             <div class="kpi-value" id="kpi-density-val">0.00 g/L</div>
             <div class="kpi-sub" id="kpi-end-sub">Max END: 0.0 ft (UHMS Limit: 5.2 g/L)</div>
@@ -989,13 +1084,13 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
         <div class="card">
           <div class="section-header">
             <h2 class="section-title">Depth &amp; Decompression Ceiling</h2>
-            <div class="segmented-pill" id="bailout-view-toggle" style="display:none;">
-              <button type="button" id="view-btn-ccr" class="active" onclick="setScheduleView('primary')">CCR Loop</button>
-              <button type="button" id="view-btn-bailout" onclick="setScheduleView('bailout')">OC Bailout</button>
+            <div class="segmented-pill" id="bailout-view-toggle" role="group" aria-label="CCR Schedule View" style="display:none;">
+              <button type="button" id="view-btn-ccr" class="active" aria-pressed="true" onclick="setScheduleView('primary')">CCR Loop</button>
+              <button type="button" id="view-btn-bailout" aria-pressed="false" onclick="setScheduleView('bailout')">OC Bailout</button>
             </div>
           </div>
 
-          <div id="active-warnings-box" class="alert-list"></div>
+          <div id="active-warnings-box" class="alert-list" role="status" aria-live="polite"></div>
 
           <div class="chart-box" id="profile-chart-container"></div>
 
@@ -1009,30 +1104,30 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
 
         <!-- Card R2: Decompression Schedule, Cylinder Gas & Tissue Compartments Tabs -->
         <div class="card">
-          <div class="tab-bar">
-            <button type="button" class="tab-btn active" onclick="switchScheduleTab('tab-deco-steps', this)">Decompression Schedule</button>
-            <button type="button" class="tab-btn" onclick="switchScheduleTab('tab-cylinders', this)">Cylinder Gas</button>
-            <button type="button" class="tab-btn" onclick="switchScheduleTab('tab-compartments', this)">Tissue Compartments</button>
+          <div class="tab-bar" role="tablist" aria-label="Dive Schedule Details" onkeydown="handleTablistKeydown(event)">
+            <button type="button" id="sched-tab-btn-steps" class="tab-btn active" role="tab" aria-selected="true" aria-controls="tab-deco-steps" tabindex="0" onclick="switchScheduleTab('tab-deco-steps', this)">Decompression Schedule</button>
+            <button type="button" id="sched-tab-btn-cylinders" class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-cylinders" tabindex="-1" onclick="switchScheduleTab('tab-cylinders', this)">Cylinder Gas</button>
+            <button type="button" id="sched-tab-btn-compartments" class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-compartments" tabindex="-1" onclick="switchScheduleTab('tab-compartments', this)">Tissue Compartments</button>
           </div>
 
           <!-- Tab 1: Ascent & Deco Steps -->
-          <div id="tab-deco-steps" class="tab-panel active">
+          <div id="tab-deco-steps" class="tab-panel active" role="tabpanel" aria-labelledby="sched-tab-btn-steps">
             <div class="table-wrap">
               <table>
                 <thead>
                   <tr>
-                    <th>Phase</th>
-                    <th>Depth</th>
-                    <th>Duration</th>
-                    <th>Runtime</th>
-                    <th>Breathing Gas</th>
-                    <th>PO2 (ATA)</th>
-                    <th>END</th>
-                    <th>Density</th>
-                    <th>GF / Lead</th>
-                    <th>CNS %</th>
-                    <th>OTU</th>
-                    <th>Gas Used</th>
+                    <th scope="col">Phase</th>
+                    <th scope="col">Depth</th>
+                    <th scope="col">Duration</th>
+                    <th scope="col">Runtime</th>
+                    <th scope="col">Breathing Gas</th>
+                    <th scope="col">PO2 (ATA)</th>
+                    <th scope="col">END</th>
+                    <th scope="col">Density</th>
+                    <th scope="col">GF / Lead</th>
+                    <th scope="col">CNS %</th>
+                    <th scope="col">OTU</th>
+                    <th scope="col">Gas Used</th>
                   </tr>
                 </thead>
                 <tbody id="deco-steps-tbody"></tbody>
@@ -1041,20 +1136,20 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
           </div>
 
           <!-- Tab 2: Cylinder Logistics -->
-          <div id="tab-cylinders" class="tab-panel">
+          <div id="tab-cylinders" class="tab-panel" role="tabpanel" aria-labelledby="sched-tab-btn-cylinders">
             <div class="table-wrap">
               <table>
                 <thead>
                   <tr>
-                    <th>Gas Mix</th>
-                    <th>Role</th>
-                    <th>Cylinder</th>
-                    <th>Start PSI</th>
-                    <th>End PSI</th>
-                    <th>Rule of 1/3 Turn PSI</th>
-                    <th>Used / Available</th>
-                    <th>% Used</th>
-                    <th>Status</th>
+                    <th scope="col">Gas Mix</th>
+                    <th scope="col">Role</th>
+                    <th scope="col">Cylinder</th>
+                    <th scope="col">Start PSI</th>
+                    <th scope="col">End PSI</th>
+                    <th scope="col">Rule of 1/3 Turn PSI</th>
+                    <th scope="col">Used / Available</th>
+                    <th scope="col">% Used</th>
+                    <th scope="col">Status</th>
                   </tr>
                 </thead>
                 <tbody id="cylinder-logistics-tbody"></tbody>
@@ -1063,21 +1158,21 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
           </div>
 
           <!-- Tab 3: 16-Compartment Matrix -->
-          <div id="tab-compartments" class="tab-panel">
+          <div id="tab-compartments" class="tab-panel" role="tabpanel" aria-labelledby="sched-tab-btn-compartments">
             <div class="table-wrap">
               <table>
                 <thead>
                   <tr>
-                    <th>Comp</th>
-                    <th>N2 t1/2 (m)</th>
-                    <th>He t1/2 (m)</th>
-                    <th>P_N2 (bar)</th>
-                    <th>P_He (bar)</th>
-                    <th>P_Total (bar)</th>
-                    <th>Raw M0 (bar)</th>
-                    <th>GF High M0</th>
-                    <th>Surf GF %</th>
-                    <th>Loading vs M0</th>
+                    <th scope="col">Comp</th>
+                    <th scope="col">N2 t1/2 (m)</th>
+                    <th scope="col">He t1/2 (m)</th>
+                    <th scope="col">P_N2 (bar)</th>
+                    <th scope="col">P_He (bar)</th>
+                    <th scope="col">P_Total (bar)</th>
+                    <th scope="col">Raw M0 (bar)</th>
+                    <th scope="col">GF High M0</th>
+                    <th scope="col">Surf GF %</th>
+                    <th scope="col">Loading vs M0</th>
                   </tr>
                 </thead>
                 <tbody id="compartments-tbody"></tbody>
@@ -1096,15 +1191,15 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
 
         <!-- Card R3: Diver Tools -->
         <div class="card">
-          <div class="tab-bar">
-            <button type="button" class="tab-btn active" onclick="switchUtilityTab('util-tab-mod', this)">EAD / END / MOD &amp; Max Depth</button>
-            <button type="button" class="tab-btn" onclick="switchUtilityTab('util-tab-bestmix', this)">Best Mix</button>
-            <button type="button" class="tab-btn" onclick="switchUtilityTab('util-tab-blender', this)">Gas Blender</button>
-            <button type="button" class="tab-btn" onclick="switchUtilityTab('util-tab-density', this)">Gas Density &amp; Rock Bottom</button>
+          <div class="tab-bar" role="tablist" aria-label="Diver Utility Calculators" onkeydown="handleTablistKeydown(event)">
+            <button type="button" id="util-tab-btn-mod" class="tab-btn active" role="tab" aria-selected="true" aria-controls="util-tab-mod" tabindex="0" onclick="switchUtilityTab('util-tab-mod', this)">EAD / END / MOD &amp; Max Depth</button>
+            <button type="button" id="util-tab-btn-bestmix" class="tab-btn" role="tab" aria-selected="false" aria-controls="util-tab-bestmix" tabindex="-1" onclick="switchUtilityTab('util-tab-bestmix', this)">Best Mix</button>
+            <button type="button" id="util-tab-btn-blender" class="tab-btn" role="tab" aria-selected="false" aria-controls="util-tab-blender" tabindex="-1" onclick="switchUtilityTab('util-tab-blender', this)">Gas Blender</button>
+            <button type="button" id="util-tab-btn-density" class="tab-btn" role="tab" aria-selected="false" aria-controls="util-tab-density" tabindex="-1" onclick="switchUtilityTab('util-tab-density', this)">Gas Density &amp; Rock Bottom</button>
           </div>
 
           <!-- Utility Tab 1: EAD / END / MOD & Max Depth -->
-          <div id="util-tab-mod" class="tab-panel active">
+          <div id="util-tab-mod" class="tab-panel active" role="tabpanel" aria-labelledby="util-tab-btn-mod">
             <div class="form-grid-3">
               <div class="field-group">
                 <label for="u1-depth">Analysis Depth (<span class="unit-depth-lbl">ft</span>)</label>
@@ -1146,7 +1241,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
           </div>
 
           <!-- Utility Tab 2: Best Mix for Depth -->
-          <div id="util-tab-bestmix" class="tab-panel">
+          <div id="util-tab-bestmix" class="tab-panel" role="tabpanel" aria-labelledby="util-tab-btn-bestmix">
             <div class="form-grid-3">
               <div class="field-group">
                 <label for="u2-depth">Target Depth (<span class="unit-depth-lbl">ft</span>)</label>
@@ -1165,7 +1260,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
           </div>
 
           <!-- Utility Tab 3: Gas Blender, Top-Up & Fill Capacity -->
-          <div id="util-tab-blender" class="tab-panel">
+          <div id="util-tab-blender" class="tab-panel" role="tabpanel" aria-labelledby="util-tab-btn-blender">
             <div class="form-grid-3">
               <div class="field-group">
                 <label for="u3-cylinder">Cylinder Type</label>
@@ -1190,15 +1285,15 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
               <div class="field-group">
                 <label for="u3-start-fo2">Residual Gas O2 % / He %</label>
                 <div style="display:flex;gap:6px;">
-                  <input type="number" id="u3-start-fo2" value="18" min="5" max="100" step="1" onchange="runUtilityBlender()" />
-                  <input type="number" id="u3-start-fhe" value="45" min="0" max="95" step="1" onchange="runUtilityBlender()" />
+                  <input type="number" id="u3-start-fo2" aria-label="Residual Gas Oxygen Percent" value="18" min="5" max="100" step="1" onchange="runUtilityBlender()" />
+                  <input type="number" id="u3-start-fhe" aria-label="Residual Gas Helium Percent" value="45" min="0" max="95" step="1" onchange="runUtilityBlender()" />
                 </div>
               </div>
               <div class="field-group">
                 <label for="u3-target-fo2">Desired Target O2 % / He %</label>
                 <div style="display:flex;gap:6px;">
-                  <input type="number" id="u3-target-fo2" value="21" min="5" max="100" step="1" onchange="runUtilityBlender()" />
-                  <input type="number" id="u3-target-fhe" value="35" min="0" max="95" step="1" onchange="runUtilityBlender()" />
+                  <input type="number" id="u3-target-fo2" aria-label="Target Gas Oxygen Percent" value="21" min="5" max="100" step="1" onchange="runUtilityBlender()" />
+                  <input type="number" id="u3-target-fhe" aria-label="Target Gas Helium Percent" value="35" min="0" max="95" step="1" onchange="runUtilityBlender()" />
                 </div>
               </div>
             </div>
@@ -1206,7 +1301,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
           </div>
 
           <!-- Utility Tab 4: Gas Density, Rock Bottom & What-If GF Comparison -->
-          <div id="util-tab-density" class="tab-panel">
+          <div id="util-tab-density" class="tab-panel" role="tabpanel" aria-labelledby="util-tab-btn-density">
             <div class="form-grid-3">
               <div class="field-group">
                 <label for="u4-switch-depth">1st Deco Switch Depth (<span class="unit-depth-lbl">ft</span>)</label>
@@ -1229,6 +1324,11 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
     </div>
 
   </main>
+
+  <footer class="site-footer">
+    <span>Model: Bühlmann ZH-L16C (1b / 1) with Erik C. Baker Gradient Factors, NOAA CNS %, and Lambertsen OTU.</span>
+    <span>Execution: Local offline browser only (no external network requests). Licensed under Apache License 2.0.</span>
+  </footer>
 
   <!-- Embedded Empirical Benchmark Data & Complete Client-Side ZH-L16C + GF Engine -->
   <script>
@@ -1847,30 +1947,45 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       };
     }
 
+    function escapeHtml(val) {
+      return String(val === null || val === undefined ? "" : val)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
     function renderGasInventoryTable() {
       const tbody = document.getElementById("gas-inventory-tbody");
       tbody.innerHTML = "";
       appState.gases.forEach((g, idx) => {
+        const rowNum = idx + 1;
+        const safeName = escapeHtml(g.name);
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td><input type="text" value="${g.name}" style="width:92px;padding:4px 6px;font-size:0.78rem;" onchange="updateGasField(${idx}, 'name', this.value)" /></td>
-          <td><input type="number" value="${Math.round(g.f_o2 * 100)}" min="5" max="100" style="width:54px;padding:4px;" onchange="updateGasFraction(${idx}, 'f_o2', this.value)" /></td>
-          <td><input type="number" value="${Math.round(g.f_he * 100)}" min="0" max="95" style="width:54px;padding:4px;" onchange="updateGasFraction(${idx}, 'f_he', this.value)" /></td>
-          <td><input type="number" value="${g.switch_depth || 0}" min="0" max="400" style="width:58px;padding:4px;" onchange="updateGasField(${idx}, 'switch_depth', Number(this.value))" /></td>
+          <td><input type="text" aria-label="Gas mix ${rowNum} name" value="${safeName}" style="width:92px;padding:4px 6px;font-size:0.78rem;" onchange="updateGasField(${idx}, 'name', this.value)" /></td>
+          <td><input type="number" aria-label="Gas mix ${rowNum} oxygen percent" value="${Math.round(g.f_o2 * 100)}" min="5" max="100" style="width:54px;padding:4px;" onchange="updateGasFraction(${idx}, 'f_o2', this.value)" /></td>
+          <td><input type="number" aria-label="Gas mix ${rowNum} helium percent" value="${Math.round(g.f_he * 100)}" min="0" max="95" style="width:54px;padding:4px;" onchange="updateGasFraction(${idx}, 'f_he', this.value)" /></td>
+          <td><input type="number" aria-label="Gas mix ${rowNum} switch depth" value="${Number(g.switch_depth) || 0}" min="0" max="400" style="width:58px;padding:4px;" onchange="updateGasField(${idx}, 'switch_depth', Number(this.value))" /></td>
           <td>
-            <select style="width:78px;padding:4px;font-size:0.75rem;" onchange="updateGasField(${idx}, 'cylinder_preset', this.value)">
-              ${Object.keys(BENCHMARK_DATA.standard_cylinders).map(k => `<option value="${k}" ${g.cylinder_preset === k ? 'selected' : ''}>${k}</option>`).join("")}
+            <select aria-label="Gas mix ${rowNum} cylinder preset" style="width:78px;padding:4px;font-size:0.75rem;" onchange="updateGasField(${idx}, 'cylinder_preset', this.value)">
+              ${Object.keys(BENCHMARK_DATA.standard_cylinders).map(k => `<option value="${escapeHtml(k)}" ${g.cylinder_preset === k ? 'selected' : ''}>${escapeHtml(k)}</option>`).join("")}
             </select>
           </td>
-          <td><input type="checkbox" ${g.enabled ? "checked" : ""} onchange="updateGasField(${idx}, 'enabled', this.checked)" /></td>
-          <td><button type="button" class="btn btn-sm" onclick="removeGasRow(${idx})">X</button></td>
+          <td><input type="checkbox" aria-label="Enable gas mix ${rowNum}" ${g.enabled ? "checked" : ""} onchange="updateGasField(${idx}, 'enabled', this.checked)" /></td>
+          <td><button type="button" class="btn btn-sm" aria-label="Remove gas mix ${rowNum}" onclick="removeGasRow(${idx})">Remove</button></td>
         `;
         tbody.appendChild(tr);
       });
     }
 
     function updateGasField(idx, field, val) {
-      appState.gases[idx][field] = val;
+      if (field === "name") {
+        appState.gases[idx][field] = String(val || "").slice(0, 64);
+      } else {
+        appState.gases[idx][field] = val;
+      }
       recomputeDashboard();
     }
 
@@ -1904,8 +2019,12 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
 
     function setDiveMode(mode) {
       appState.diveMode = mode;
-      document.getElementById("mode-btn-oc").classList.toggle("active", mode === "OC");
-      document.getElementById("mode-btn-ccr").classList.toggle("active", mode === "CCR");
+      const btnOc = document.getElementById("mode-btn-oc");
+      const btnCcr = document.getElementById("mode-btn-ccr");
+      btnOc.classList.toggle("active", mode === "OC");
+      btnOc.setAttribute("aria-pressed", mode === "OC" ? "true" : "false");
+      btnCcr.classList.toggle("active", mode === "CCR");
+      btnCcr.setAttribute("aria-pressed", mode === "CCR" ? "true" : "false");
       document.getElementById("bailout-view-toggle").style.display = mode === "CCR" ? "inline-flex" : "none";
       if (mode === "OC") appState.scheduleView = "primary";
       recomputeDashboard();
@@ -1913,8 +2032,12 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
 
     function setScheduleView(view) {
       appState.scheduleView = view;
-      document.getElementById("view-btn-ccr").classList.toggle("active", view === "primary");
-      document.getElementById("view-btn-bailout").classList.toggle("active", view === "bailout");
+      const btnCcr = document.getElementById("view-btn-ccr");
+      const btnBo = document.getElementById("view-btn-bailout");
+      btnCcr.classList.toggle("active", view === "primary");
+      btnCcr.setAttribute("aria-pressed", view === "primary" ? "true" : "false");
+      btnBo.classList.toggle("active", view === "bailout");
+      btnBo.setAttribute("aria-pressed", view === "bailout" ? "true" : "false");
       recomputeDashboard();
     }
 
@@ -1925,8 +2048,12 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       appState.depthUnits = units;
       appState.volumeUnits = toMeters ? "liters" : "cuft";
 
-      document.getElementById("unit-btn-feet").classList.toggle("active", units === "feet");
-      document.getElementById("unit-btn-meters").classList.toggle("active", units === "meters");
+      const btnFeet = document.getElementById("unit-btn-feet");
+      const btnMeters = document.getElementById("unit-btn-meters");
+      btnFeet.classList.toggle("active", units === "feet");
+      btnFeet.setAttribute("aria-pressed", units === "feet" ? "true" : "false");
+      btnMeters.classList.toggle("active", units === "meters");
+      btnMeters.setAttribute("aria-pressed", units === "meters" ? "true" : "false");
       document.querySelectorAll(".unit-depth-lbl").forEach(el => { el.textContent = toMeters ? "m" : "ft"; });
 
       document.getElementById("input-depth").value = Math.round(Number(document.getElementById("input-depth").value) * factor);
@@ -2012,7 +2139,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
     }
 
     // -----------------------------------------------------------------------
-    // SVG Profile Renderer, Dual Y-Axis & Interactive Hover Tooltip
+    // SVG Profile Renderer, Dual Y-Axis & Interactive Hover/Keyboard Tooltip
     // -----------------------------------------------------------------------
     function renderProfileSvg(plan, depthUnits) {
       const container = document.getElementById("profile-chart-container");
@@ -2030,6 +2157,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       const dUnitLbl = depthUnits === "feet" ? "ft" : "m";
 
       appState.chartGeom = { width, height, padL, padR, padT, padB, plotW, plotH, maxT, maxD, depthUnits, dUnitLbl };
+      appState.keyboardChartTime = 0;
 
       const xOf = t => padL + (t / maxT) * plotW;
       const yOf = d => padT + (d / maxD) * plotH;
@@ -2042,7 +2170,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
 
       let gridLines = `
         <text x="${padL - 6}" y="${padT - 8}" text-anchor="end" fill="var(--text-secondary)" font-family="var(--font-mono)" font-size="9" font-weight="600">DEPTH (${dUnitLbl.toUpperCase()})</text>
-        <text x="${padL + plotW + 6}" y="${padT - 8}" text-anchor="start" fill="#4F46E5" font-family="var(--font-mono)" font-size="9" font-weight="600">PO2 (ATA)</text>
+        <text x="${padL + plotW + 6}" y="${padT - 8}" text-anchor="start" fill="var(--accent-tertiary-text)" font-family="var(--font-mono)" font-size="9" font-weight="600">PO2 (ATA)</text>
       `;
       for (let i = 0; i <= 4; i++) {
         const dVal = (maxD / 4) * i;
@@ -2050,7 +2178,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
         const y = yOf(dVal);
         gridLines += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${padL + plotW}" y2="${y.toFixed(1)}" stroke="var(--border-color)" stroke-dasharray="3,3" />`;
         gridLines += `<text x="${padL - 6}" y="${(y + 4).toFixed(1)}" text-anchor="end" fill="var(--text-secondary)" font-family="var(--font-mono)" font-size="10">${Math.round(dVal)}${dUnitLbl}</text>`;
-        gridLines += `<text x="${padL + plotW + 6}" y="${(y + 4).toFixed(1)}" text-anchor="start" fill="#4F46E5" font-family="var(--font-mono)" font-size="10">${po2Val.toFixed(2)} ATA</text>`;
+        gridLines += `<text x="${padL + plotW + 6}" y="${(y + 4).toFixed(1)}" text-anchor="start" fill="var(--accent-tertiary-text)" font-family="var(--font-mono)" font-size="10">${po2Val.toFixed(2)} ATA</text>`;
       }
 
       for (let i = 0; i <= 5; i++) {
@@ -2070,7 +2198,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       });
 
       container.innerHTML = `
-        <svg id="profile-chart-svg" width="100%" height="${height}" viewBox="0 0 ${width} ${height}">
+        <svg id="profile-chart-svg" tabindex="0" role="img" aria-label="Interactive dive depth, gradient factor ceiling, and inspired PO2 profile chart. Use Left and Right arrow keys to inspect telemetry across dive runtime." width="100%" height="${height}" viewBox="0 0 ${width} ${height}" onkeydown="handleChartKeydown(event)" onblur="handleChartMouseLeave()">
           <defs>
             <linearGradient id="depthGrad" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stop-color="#0D9488" stop-opacity="0.06" />
@@ -2091,7 +2219,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
           </g>
           <rect class="chart-hit-area" x="${padL}" y="${padT}" width="${plotW}" height="${plotH}" fill="transparent" style="cursor:crosshair;" onmousemove="handleChartMouseMove(event)" onmouseleave="handleChartMouseLeave()" />
         </svg>
-        <div id="chart-hover-tooltip" class="chart-tooltip"></div>
+        <div id="chart-hover-tooltip" class="chart-tooltip" role="status" aria-live="polite"></div>
       `;
     }
 
@@ -2118,19 +2246,14 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       };
     }
 
-    function handleChartMouseMove(evt) {
+    function renderChartHoverAtTime(tQuery, relX, relY) {
       const g = appState.chartGeom;
       const plan = appState.lastPlanResult;
-      const svgEl = document.getElementById("profile-chart-svg");
       const hoverGrp = document.getElementById("chart-hover-group");
       const tooltip = document.getElementById("chart-hover-tooltip");
-      if (!g || !plan || !svgEl || !hoverGrp || !tooltip) return;
+      const container = document.getElementById("profile-chart-container");
+      if (!g || !plan || !hoverGrp || !tooltip || !container) return;
 
-      const rect = svgEl.getBoundingClientRect();
-      const scaleX = g.width / Math.max(1, rect.width);
-      const svgX = (evt.clientX - rect.left) * scaleX;
-      const clampedX = Math.min(g.padL + g.plotW, Math.max(g.padL, svgX));
-      const tQuery = ((clampedX - g.padL) / g.plotW) * g.maxT;
       const snap = interpolatePlanAtTime(plan, tQuery);
       if (!snap) return;
 
@@ -2156,21 +2279,19 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
 
       tooltip.innerHTML = `
         <div style="font-weight:600;border-bottom:1px solid var(--border-color);padding-bottom:4px;margin-bottom:5px;display:flex;justify-content:space-between;gap:10px;">
-          <span>Time: ${snap.time_mmss}</span>
-          <span style="color:var(--accent-primary);">${snap.phase}</span>
+          <span>Time: ${escapeHtml(snap.time_mmss)}</span>
+          <span style="color:var(--accent-primary-text);">${escapeHtml(snap.phase)}</span>
         </div>
-        <div><span style="color:#0D9488;font-weight:600;">Depth:</span> ${snap.depth.toFixed(1)} ${g.dUnitLbl}</div>
-        <div><span style="color:#E11D48;font-weight:600;">GF Ceiling:</span> ${snap.ceiling_depth.toFixed(1)} ${g.dUnitLbl} (Comp #${snap.leading_compartment})</div>
-        <div><span style="color:#4F46E5;font-weight:600;">Inspired PO2:</span> ${snap.po2_ata.toFixed(2)} ATA</div>
-        <div><span style="color:#D97706;font-weight:600;">Gas Mix:</span> ${snap.gas_name}</div>
-        <div><span style="color:var(--text-secondary);">END / Density:</span> ${snap.end.toFixed(0)} ${g.dUnitLbl} / ${snap.density_g_l.toFixed(2)} g/L</div>
+        <div><span style="color:var(--accent-primary-text);font-weight:600;">Depth:</span> ${snap.depth.toFixed(1)} ${escapeHtml(g.dUnitLbl)}</div>
+        <div><span style="color:var(--status-warning-text);font-weight:600;">GF Ceiling:</span> ${snap.ceiling_depth.toFixed(1)} ${escapeHtml(g.dUnitLbl)} (Comp #${escapeHtml(snap.leading_compartment)})</div>
+        <div><span style="color:var(--accent-tertiary-text);font-weight:600;">Inspired PO2:</span> ${snap.po2_ata.toFixed(2)} ATA</div>
+        <div><span style="color:var(--accent-secondary-text);font-weight:600;">Gas Mix:</span> ${escapeHtml(snap.gas_name)}</div>
+        <div><span style="color:var(--text-secondary);">END / Density:</span> ${snap.end.toFixed(0)} ${escapeHtml(g.dUnitLbl)} / ${snap.density_g_l.toFixed(2)} g/L</div>
         <div><span style="color:var(--text-secondary);">CNS / OTU:</span> ${snap.cns_pct.toFixed(1)}% / ${snap.otu.toFixed(1)}</div>
       `;
       tooltip.style.display = "block";
 
-      const containerRect = document.getElementById("profile-chart-container").getBoundingClientRect();
-      const relX = evt.clientX - containerRect.left;
-      const relY = evt.clientY - containerRect.top;
+      const containerRect = container.getBoundingClientRect();
       const ttWidth = tooltip.offsetWidth || 235;
       const ttHeight = tooltip.offsetHeight || 145;
       const leftPos = (relX + 16 + ttWidth > containerRect.width - 12)
@@ -2179,6 +2300,46 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       const topPos = Math.min(Math.max(12, relY - 24), Math.max(12, containerRect.height - ttHeight - 12));
       tooltip.style.left = `${leftPos}px`;
       tooltip.style.top = `${topPos}px`;
+    }
+
+    function handleChartMouseMove(evt) {
+      const g = appState.chartGeom;
+      const svgEl = document.getElementById("profile-chart-svg");
+      const container = document.getElementById("profile-chart-container");
+      if (!g || !svgEl || !container) return;
+
+      const rect = svgEl.getBoundingClientRect();
+      const scaleX = g.width / Math.max(1, rect.width);
+      const svgX = (evt.clientX - rect.left) * scaleX;
+      const clampedX = Math.min(g.padL + g.plotW, Math.max(g.padL, svgX));
+      const tQuery = ((clampedX - g.padL) / g.plotW) * g.maxT;
+      const containerRect = container.getBoundingClientRect();
+      renderChartHoverAtTime(tQuery, evt.clientX - containerRect.left, evt.clientY - containerRect.top);
+    }
+
+    function handleChartKeydown(evt) {
+      const g = appState.chartGeom;
+      if (!g) return;
+      const stepMin = Math.max(0.5, g.maxT / 20.0);
+      let nextT = appState.keyboardChartTime || 0;
+      if (evt.key === "ArrowRight") {
+        nextT = Math.min(g.maxT, nextT + stepMin);
+      } else if (evt.key === "ArrowLeft") {
+        nextT = Math.max(0, nextT - stepMin);
+      } else if (evt.key === "Home") {
+        nextT = 0;
+      } else if (evt.key === "End") {
+        nextT = g.maxT;
+      } else if (evt.key === "Escape") {
+        handleChartMouseLeave();
+        return;
+      } else {
+        return;
+      }
+      evt.preventDefault();
+      appState.keyboardChartTime = nextT;
+      const relX = g.padL + (nextT / g.maxT) * g.plotW;
+      renderChartHoverAtTime(nextT, relX, g.padT + 20);
     }
 
     function handleChartMouseLeave() {
@@ -2206,29 +2367,29 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       document.getElementById("kpi-deco-sub").textContent =
         `Total Deco: ${s.total_deco_mmss} | 1st Stop: ${s.first_stop_depth.toFixed(0)} ${dUnit}`;
       const decoBadge = document.getElementById("kpi-deco-badge");
-      decoBadge.textContent = s.is_deco_dive ? "DECO REQUIRED" : "NO-DECO (NDL)";
+      decoBadge.textContent = s.is_deco_dive ? "[DECO REQUIRED]" : "[NO-DECO (NDL)]";
       decoBadge.className = "status-badge " + (s.is_deco_dive ? "status-caution" : "status-nominal");
 
       document.getElementById("kpi-depth-val").textContent = `${s.max_depth.toFixed(1)} ${dUnit}`;
-      document.getElementById("kpi-gf-badge").textContent = `GF ${cfg.gfLow}/${cfg.gfHigh}`;
+      document.getElementById("kpi-gf-badge").textContent = `[GF ${cfg.gfLow}/${cfg.gfHigh}]`;
       document.getElementById("kpi-tissue-sub").textContent =
         `Leading Comp: #${s.surfacing_leading_compartment} | Surf GF: ${s.surfacing_gf_pct.toFixed(1)}%`;
 
       document.getElementById("kpi-oxtox-val").textContent = `${s.final_cns_pct.toFixed(1)}% / ${s.final_otu.toFixed(0)}`;
       document.getElementById("kpi-po2-sub").textContent = `Peak PO2: ${s.max_po2_ata.toFixed(2)} ATA (NOAA Max 1.60)`;
       const oxBadge = document.getElementById("kpi-oxtox-badge");
-      oxBadge.textContent = s.final_cns_pct > 100 ? "CRITICAL >100%" : (s.final_cns_pct > 80 ? "CAUTION >80%" : "NOMINAL");
+      oxBadge.textContent = s.final_cns_pct > 100 ? "[CRITICAL >100%]" : (s.final_cns_pct > 80 ? "[CAUTION >80%]" : "[NOMINAL]");
       oxBadge.className = "status-badge " + (s.final_cns_pct > 100 ? "status-critical" : (s.final_cns_pct > 80 ? "status-caution" : "status-nominal"));
 
       document.getElementById("kpi-density-val").textContent = `${s.max_density_g_l.toFixed(2)} g/L`;
       document.getElementById("kpi-end-sub").textContent = `Max END: ${s.max_end.toFixed(1)} ${dUnit} (UHMS Limit 5.2 g/L)`;
       const densBadge = document.getElementById("kpi-density-badge");
-      densBadge.textContent = s.max_density_g_l > 6.2 ? "CRITICAL >6.2" : (s.max_density_g_l > 5.2 ? "WARNING >5.2" : "NOMINAL");
+      densBadge.textContent = s.max_density_g_l > 6.2 ? "[CRITICAL >6.2]" : (s.max_density_g_l > 5.2 ? "[WARNING >5.2]" : "[NOMINAL]");
       densBadge.className = "status-badge " + (s.max_density_g_l > 6.2 ? "status-critical" : (s.max_density_g_l > 5.2 ? "status-caution" : "status-nominal"));
 
       // Warnings
       const warnBox = document.getElementById("active-warnings-box");
-      warnBox.innerHTML = plan.warnings.map(w => `<div class="alert-item">${w}</div>`).join("");
+      warnBox.innerHTML = plan.warnings.map(w => `<div class="alert-item">[ALERT] ${escapeHtml(w)}</div>`).join("");
 
       // Render SVG Chart
       renderProfileSvg(plan, cfg.depthUnits);
@@ -2237,18 +2398,18 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       const stepsTbody = document.getElementById("deco-steps-tbody");
       stepsTbody.innerHTML = plan.steps.map(st => `
         <tr class="${st.phase === 'DECO_STOP' ? 'row-deco' : ''}">
-          <td><strong>${st.phase}</strong></td>
-          <td>${st.depth.toFixed(0)} ${dUnit}</td>
-          <td>${st.duration_mmss}</td>
-          <td>${st.runtime_mmss}</td>
-          <td>${st.gas_name}</td>
+          <td><strong>${escapeHtml(st.phase)}</strong></td>
+          <td>${st.depth.toFixed(0)} ${escapeHtml(dUnit)}</td>
+          <td>${escapeHtml(st.duration_mmss)}</td>
+          <td>${escapeHtml(st.runtime_mmss)}</td>
+          <td>${escapeHtml(st.gas_name)}</td>
           <td>${st.po2_ata.toFixed(2)}</td>
-          <td>${st.end.toFixed(0)} ${dUnit}</td>
+          <td>${st.end.toFixed(0)} ${escapeHtml(dUnit)}</td>
           <td>${st.density_g_l.toFixed(2)} g/L</td>
-          <td>${st.gf_target.toFixed(0)}% (#${st.leading_compartment})</td>
+          <td>${st.gf_target.toFixed(0)}% (#${escapeHtml(st.leading_compartment)})</td>
           <td>${st.cns_pct.toFixed(1)}%</td>
           <td>${st.otu.toFixed(1)}</td>
-          <td>${st.gas_volume_used.toFixed(1)} ${vUnit}</td>
+          <td>${st.gas_volume_used.toFixed(1)} ${escapeHtml(vUnit)}</td>
         </tr>
       `).join("");
 
@@ -2256,25 +2417,30 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       const cylTbody = document.getElementById("cylinder-logistics-tbody");
       cylTbody.innerHTML = plan.cylinder_logistics.map(c => `
         <tr>
-          <td><strong>${c.gas_name}</strong></td>
-          <td>${c.role.toUpperCase()}</td>
-          <td>${c.cylinder_preset}</td>
+          <td><strong>${escapeHtml(c.gas_name)}</strong></td>
+          <td>${escapeHtml(String(c.role || "").toUpperCase())}</td>
+          <td>${escapeHtml(c.cylinder_preset)}</td>
           <td>${c.start_pressure_psi} psi</td>
           <td>${c.end_pressure_psi} psi</td>
           <td>${c.turn_pressure_thirds_psi} psi</td>
-          <td>${c.volume_consumed.toFixed(1)} / ${c.volume_available.toFixed(1)} ${c.volume_units}</td>
+          <td>${c.volume_consumed.toFixed(1)} / ${c.volume_available.toFixed(1)} ${escapeHtml(c.volume_units)}</td>
           <td>${c.percent_consumed.toFixed(1)}%</td>
-          <td><span class="status-badge ${c.status === 'OK' ? 'status-nominal' : 'status-critical'}">${c.status}</span></td>
+          <td><span class="status-badge ${c.status === 'OK' ? 'status-nominal' : 'status-critical'}">[${escapeHtml(c.status)}]</span></td>
         </tr>
       `).join("");
 
       // Render 16-Compartment Matrix
       const compTbody = document.getElementById("compartments-tbody");
       compTbody.innerHTML = plan.final_compartments.map(c => {
-        const barColor = c.surface_gf_pct > cfg.gfHigh ? "#E11D48" : (c.surface_gf_pct > cfg.gfHigh * 0.85 ? "#D97706" : "#0D9488");
+        const isOver = c.surface_gf_pct > cfg.gfHigh;
+        const isCaution = !isOver && c.surface_gf_pct > cfg.gfHigh * 0.85;
+        const barColor = isOver ? "#E11D48" : (isCaution ? "#D97706" : "#0D9488");
+        const stateTag = isOver ? "[OVER GF]" : (isCaution ? "[CAUTION]" : "[OK]");
+        const stateClass = isOver ? "status-critical" : (isCaution ? "status-caution" : "status-nominal");
+        const pctVal = Math.min(100, Math.max(0, c.pct_of_m0_raw));
         return `
           <tr>
-            <td><strong>#${c.compartment}</strong></td>
+            <td><strong>#${escapeHtml(c.compartment)}</strong></td>
             <td>${c.t_half_n2_min.toFixed(2)}</td>
             <td>${c.t_half_he_min.toFixed(2)}</td>
             <td>${c.p_n2_bar.toFixed(4)}</td>
@@ -2283,9 +2449,12 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
             <td>${c.m0_raw_bar.toFixed(4)}</td>
             <td>${c.m0_gf_high_bar.toFixed(4)}</td>
             <td>${c.surface_gf_pct.toFixed(1)}%</td>
-            <td style="min-width:130px;">
-              <div class="progress-bar-track">
-                <div class="progress-bar-fill" style="width:${Math.min(100, c.pct_of_m0_raw).toFixed(1)}%;background:${barColor};"></div>
+            <td>
+              <div class="progress-bar-row">
+                <div class="progress-bar-track" role="progressbar" aria-valuenow="${pctVal.toFixed(0)}" aria-valuemin="0" aria-valuemax="100" aria-label="Compartment ${escapeHtml(c.compartment)} loading ${pctVal.toFixed(1)} percent of M0">
+                  <div class="progress-bar-fill" style="width:${pctVal.toFixed(1)}%;background:${barColor};"></div>
+                </div>
+                <span class="status-badge ${stateClass}">${stateTag}</span>
               </div>
             </td>
           </tr>
@@ -2330,28 +2499,28 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
           <table>
             <thead>
               <tr>
-                <th>Gas Mix</th>
-                <th>MOD (${maxPo2.toFixed(2)} ATA)</th>
-                <th>Deco MOD (1.60)</th>
-                <th>MinOD (0.16)</th>
-                <th>EAD @ ${depth}${dUnit}</th>
-                <th>END @ ${depth}${dUnit}</th>
-                <th>MND Limit</th>
-                <th>MDD (5.2 g/L)</th>
-                <th>Max Safe Depth (${cylKey})</th>
+                <th scope="col">Gas Mix</th>
+                <th scope="col">MOD (${maxPo2.toFixed(2)} ATA)</th>
+                <th scope="col">Deco MOD (1.60)</th>
+                <th scope="col">MinOD (0.16)</th>
+                <th scope="col">EAD @ ${depth}${escapeHtml(dUnit)}</th>
+                <th scope="col">END @ ${depth}${escapeHtml(dUnit)}</th>
+                <th scope="col">MND Limit</th>
+                <th scope="col">MDD (5.2 g/L)</th>
+                <th scope="col">Max Safe Depth (${escapeHtml(cylKey)})</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td><strong>${formatGasName(fO2, fHe)}</strong></td>
-                <td>${props.modWork.toFixed(1)} ${dUnit}</td>
-                <td>${props.modDeco.toFixed(1)} ${dUnit}</td>
-                <td>${props.minOd.toFixed(1)} ${dUnit}</td>
-                <td>${props.ead.toFixed(1)} ${dUnit}</td>
-                <td>${props.end.toFixed(1)} ${dUnit}</td>
-                <td>${props.mnd.toFixed(1)} ${dUnit}</td>
-                <td>${props.mdd52.toFixed(1)} ${dUnit}</td>
-                <td><strong>${maxSafeD.toFixed(1)} ${dUnit}</strong></td>
+                <td><strong>${escapeHtml(formatGasName(fO2, fHe))}</strong></td>
+                <td>${props.modWork.toFixed(1)} ${escapeHtml(dUnit)}</td>
+                <td>${props.modDeco.toFixed(1)} ${escapeHtml(dUnit)}</td>
+                <td>${props.minOd.toFixed(1)} ${escapeHtml(dUnit)}</td>
+                <td>${props.ead.toFixed(1)} ${escapeHtml(dUnit)}</td>
+                <td>${props.end.toFixed(1)} ${escapeHtml(dUnit)}</td>
+                <td>${props.mnd.toFixed(1)} ${escapeHtml(dUnit)}</td>
+                <td>${props.mdd52.toFixed(1)} ${escapeHtml(dUnit)}</td>
+                <td><strong>${maxSafeD.toFixed(1)} ${escapeHtml(dUnit)}</strong></td>
               </tr>
             </tbody>
           </table>
@@ -2386,26 +2555,26 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
           <table>
             <thead>
               <tr>
-                <th>Recommended Ideal Mix</th>
-                <th>O2 %</th>
-                <th>He %</th>
-                <th>N2 %</th>
-                <th>PO2 @ ${depth}${dUnit}</th>
-                <th>END @ ${depth}${dUnit}</th>
-                <th>Density @ ${depth}${dUnit}</th>
-                <th>Surface Breathable</th>
+                <th scope="col">Recommended Ideal Mix</th>
+                <th scope="col">O2 %</th>
+                <th scope="col">He %</th>
+                <th scope="col">N2 %</th>
+                <th scope="col">PO2 @ ${depth}${escapeHtml(dUnit)}</th>
+                <th scope="col">END @ ${depth}${escapeHtml(dUnit)}</th>
+                <th scope="col">Density @ ${depth}${escapeHtml(dUnit)}</th>
+                <th scope="col">Surface Breathable</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td><strong>${formatGasName(fO2Best, fHeBest)}</strong></td>
+                <td><strong>${escapeHtml(formatGasName(fO2Best, fHeBest))}</strong></td>
                 <td>${Math.round(fO2Best * 100)}%</td>
                 <td>${Math.round(fHeBest * 100)}%</td>
                 <td>${Math.round(fN2Best * 100)}%</td>
                 <td>${props.po2Ata.toFixed(2)} ATA</td>
-                <td>${props.end.toFixed(1)} ${dUnit}</td>
+                <td>${props.end.toFixed(1)} ${escapeHtml(dUnit)}</td>
                 <td>${props.rhoDepth.toFixed(2)} g/L</td>
-                <td>${fO2Best >= 0.18 ? "YES" : "NO (Travel Mix Req)"}</td>
+                <td>${fO2Best >= 0.18 ? "[YES]" : "[NO - Travel Mix Req]"}</td>
               </tr>
             </tbody>
           </table>
@@ -2445,18 +2614,18 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
           <table>
             <thead>
               <tr>
-                <th>Target Mix</th>
-                <th>Bleed Down</th>
-                <th>Step 1: Start PSI</th>
-                <th>Step 2: Add Helium</th>
-                <th>Step 3: Add Oxygen</th>
-                <th>Step 4: Top-Up Air</th>
-                <th>Deliverable Capacity (${cylKey})</th>
+                <th scope="col">Target Mix</th>
+                <th scope="col">Bleed Down</th>
+                <th scope="col">Step 1: Start PSI</th>
+                <th scope="col">Step 2: Add Helium</th>
+                <th scope="col">Step 3: Add Oxygen</th>
+                <th scope="col">Step 4: Top-Up Air</th>
+                <th scope="col">Deliverable Capacity (${escapeHtml(cylKey)})</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td><strong>${formatGasName(fO2Target, fHeTarget)}</strong></td>
+                <td><strong>${escapeHtml(formatGasName(fO2Target, fHeTarget))}</strong></td>
                 <td>${bleedPsi.toFixed(0)} psi</td>
                 <td>${pInit.toFixed(0)} psi</td>
                 <td>+${addHe.toFixed(0)} psi (to ${(pInit + addHe).toFixed(0)} psi)</td>
@@ -2503,16 +2672,16 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
           <table>
             <thead>
               <tr>
-                <th>Rock Bottom Volume (2 Divers)</th>
-                <th>Minimum Reserve Pressure (${bGas.cylinder_preset})</th>
-                <th>Rule of Thirds Turn Pressure</th>
-                <th>CNS % Before SI</th>
-                <th>CNS % After ${siMin}m Surface Interval</th>
+                <th scope="col">Rock Bottom Volume (2 Divers)</th>
+                <th scope="col">Minimum Reserve Pressure (${escapeHtml(bGas.cylinder_preset)})</th>
+                <th scope="col">Rule of Thirds Turn Pressure</th>
+                <th scope="col">CNS % Before SI</th>
+                <th scope="col">CNS % After ${siMin}m Surface Interval</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td><strong>${rockBottomVol.toFixed(1)} ${vUnit}</strong> (1m solve + ascent to ${targetSw}${dUnit})</td>
+                <td><strong>${rockBottomVol.toFixed(1)} ${escapeHtml(vUnit)}</strong> (1m solve + ascent to ${targetSw}${escapeHtml(dUnit)})</td>
                 <td><strong>${rbPsi} psi</strong></td>
                 <td>${Math.round(spec.rated_psi * 2 / 3)} psi</td>
                 <td>${curCns.toFixed(1)}%</td>
@@ -2531,6 +2700,24 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       runUtilityDensityAndRockBottom();
     }
 
+    function handleTablistKeydown(evt) {
+      const tablist = evt.currentTarget;
+      if (!tablist) return;
+      const tabs = Array.from(tablist.querySelectorAll('[role="tab"]'));
+      if (!tabs.length) return;
+      const curIdx = tabs.indexOf(document.activeElement);
+      if (curIdx < 0) return;
+      let nextIdx = curIdx;
+      if (evt.key === "ArrowRight") nextIdx = (curIdx + 1) % tabs.length;
+      else if (evt.key === "ArrowLeft") nextIdx = (curIdx - 1 + tabs.length) % tabs.length;
+      else if (evt.key === "Home") nextIdx = 0;
+      else if (evt.key === "End") nextIdx = tabs.length - 1;
+      else return;
+      evt.preventDefault();
+      tabs[nextIdx].focus();
+      tabs[nextIdx].click();
+    }
+
     function switchMainWorkspaceTab(viewId, btnEl) {
       ["main-view-planner", "main-view-tools"].forEach(id => {
         const el = document.getElementById(id);
@@ -2542,11 +2729,13 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
         const isPlanner = (viewId === "main-view-planner");
         btnPlanner.classList.toggle("active", isPlanner);
         btnPlanner.setAttribute("aria-selected", isPlanner ? "true" : "false");
+        btnPlanner.setAttribute("tabindex", isPlanner ? "0" : "-1");
       }
       if (btnTools) {
         const isTools = (viewId === "main-view-tools");
         btnTools.classList.toggle("active", isTools);
         btnTools.setAttribute("aria-selected", isTools ? "true" : "false");
+        btnTools.setAttribute("tabindex", isTools ? "0" : "-1");
       }
       if (viewId === "main-view-planner" && appState.lastPlanResult) {
         renderProfileSvg(appState.lastPlanResult, appState.depthUnits);
@@ -2579,24 +2768,35 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       ];
       renderGasInventoryTable();
       recomputeDashboard();
-      flashProfileStatus("NEW PROFILE INITIALIZED");
+      flashProfileStatus("[NEW PROFILE INITIALIZED]");
     }
 
     function switchScheduleTab(tabId, btnEl) {
       ["tab-deco-steps", "tab-cylinders", "tab-compartments"].forEach(id => {
         document.getElementById(id).classList.toggle("active", id === tabId);
       });
-      btnEl.parentElement.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b === btnEl));
+      btnEl.parentElement.querySelectorAll(".tab-btn").forEach(b => {
+        const isActive = (b === btnEl);
+        b.classList.toggle("active", isActive);
+        b.setAttribute("aria-selected", isActive ? "true" : "false");
+        b.setAttribute("tabindex", isActive ? "0" : "-1");
+      });
     }
 
     function switchUtilityTab(tabId, btnEl) {
       ["util-tab-mod", "util-tab-bestmix", "util-tab-blender", "util-tab-density"].forEach(id => {
         document.getElementById(id).classList.toggle("active", id === tabId);
       });
-      btnEl.parentElement.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b === btnEl));
+      btnEl.parentElement.querySelectorAll(".tab-btn").forEach(b => {
+        const isActive = (b === btnEl);
+        b.classList.toggle("active", isActive);
+        b.setAttribute("aria-selected", isActive ? "true" : "false");
+        b.setAttribute("tabindex", isActive ? "0" : "-1");
+      });
     }
 
     const CUSTOM_PROFILES_STORAGE_KEY = "zhl16c-custom-profiles";
+    const MAX_IMPORT_BYTES = 1048576;
 
     function getCustomProfiles() {
       try {
@@ -2611,6 +2811,21 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
 
     function saveCustomProfiles(list) {
       localStorage.setItem(CUSTOM_PROFILES_STORAGE_KEY, JSON.stringify(list));
+    }
+
+    function clearAllLocalData() {
+      try {
+        localStorage.removeItem(CUSTOM_PROFILES_STORAGE_KEY);
+        localStorage.removeItem("theme-preference");
+      } catch (e) {
+        // Storage unavailable
+      }
+      currentThemeMode = "light";
+      applyEffectiveTheme("light");
+      const firstId = BENCHMARK_DATA.profiles[0] && BENCHMARK_DATA.profiles[0].profile_id;
+      populatePresetDropdown(firstId);
+      if (firstId) loadBenchmarkPreset(firstId);
+      flashProfileStatus("[LOCAL DATA CLEARED]");
     }
 
     function flashProfileStatus(msg, isWarning = false) {
@@ -2698,7 +2913,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       const dUnit = cfgObj.depth_units === "feet" ? "ft" : "m";
       const primaryGas = (cfgObj.oc_gases[0] && cfgObj.oc_gases[0].name) || (cfgObj.ccr_diluent && cfgObj.ccr_diluent.name) || "Mix";
       const defaultTitle = `${cfgObj.dive_mode} ${primaryGas} - ${cfgObj.segments[0].depth} ${dUnit} for ${cfgObj.segments[0].time_min} min (GF ${cfgObj.gf_low}/${cfgObj.gf_high})`;
-      const rawTitle = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : defaultTitle;
+      const rawTitle = (nameInput && nameInput.value.trim()) ? nameInput.value.trim().slice(0, 120) : defaultTitle;
       if (nameInput) nameInput.value = rawTitle;
 
       const slugId = "custom-" + rawTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48);
@@ -2718,7 +2933,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       }
       saveCustomProfiles(customList);
       populatePresetDropdown(slugId);
-      flashProfileStatus("SAVED TO DROPDOWN");
+      flashProfileStatus("[SAVED TO DROPDOWN]");
     }
 
     function deleteSelectedProfileFromBrowser() {
@@ -2728,14 +2943,14 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       const customList = getCustomProfiles();
       const filtered = customList.filter(p => p.profile_id !== targetId);
       if (filtered.length === customList.length) {
-        flashProfileStatus("BUILT-IN PROFILE (CANNOT DELETE)", true);
+        flashProfileStatus("[BUILT-IN PROFILE]", true);
         return;
       }
       saveCustomProfiles(filtered);
       const fallbackId = (filtered[0] && filtered[0].profile_id) || (BENCHMARK_DATA.profiles[0] && BENCHMARK_DATA.profiles[0].profile_id);
       populatePresetDropdown(fallbackId);
       if (fallbackId) loadBenchmarkPreset(fallbackId);
-      flashProfileStatus("DELETED PROFILE");
+      flashProfileStatus("[DELETED PROFILE]");
     }
 
     function exportProfilesJson() {
@@ -2760,42 +2975,154 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      flashProfileStatus("EXPORTED JSON");
+      flashProfileStatus("[EXPORTED JSON]");
+    }
+
+    function stripUnsafeKeys(obj) {
+      if (Array.isArray(obj)) return obj.map(stripUnsafeKeys);
+      if (!obj || typeof obj !== "object") return obj;
+      const clean = {};
+      Object.keys(obj).forEach(k => {
+        if (k === "__proto__" || k === "constructor" || k === "prototype") return;
+        clean[k] = stripUnsafeKeys(obj[k]);
+      });
+      return clean;
+    }
+
+    function sanitizeImportedGas(rawGas, fallbackRole) {
+      if (!rawGas || typeof rawGas !== "object") return null;
+      const fO2 = Number(rawGas.f_o2);
+      const fHe = Number(rawGas.f_he || 0);
+      if (!Number.isFinite(fO2) || !Number.isFinite(fHe) || fO2 < 0.01 || fO2 > 1.0 || fHe < 0 || fHe > 0.99 || fO2 + fHe > 1.0001) {
+        return null;
+      }
+      const allowedRoles = ["bottom", "travel", "deco", "diluent", "bailout"];
+      const role = allowedRoles.includes(rawGas.role) ? rawGas.role : fallbackRole;
+      const cyl = Object.prototype.hasOwnProperty.call(BENCHMARK_DATA.standard_cylinders, rawGas.cylinder_preset)
+        ? rawGas.cylinder_preset
+        : "AL80";
+      const startPsi = Number(rawGas.start_pressure_psi);
+      const maxPo2 = Number(rawGas.max_po2);
+      const swDepth = rawGas.switch_depth === null || rawGas.switch_depth === undefined ? null : Number(rawGas.switch_depth);
+      return {
+        name: String(rawGas.name || formatGasName(fO2, fHe)).trim().slice(0, 64) || formatGasName(fO2, fHe),
+        f_o2: fO2,
+        f_he: fHe,
+        role,
+        max_po2: Number.isFinite(maxPo2) && maxPo2 >= 0.5 && maxPo2 <= 2.0 ? maxPo2 : 1.40,
+        switch_depth: swDepth !== null && Number.isFinite(swDepth) && swDepth >= 0 ? swDepth : null,
+        cylinder_preset: cyl,
+        start_pressure_psi: Number.isFinite(startPsi) && startPsi > 0 ? startPsi : 3000,
+        enabled: rawGas.enabled !== false
+      };
+    }
+
+    function sanitizeImportedConfig(rawCfg) {
+      if (!rawCfg || typeof rawCfg !== "object") return null;
+      const c = stripUnsafeKeys(rawCfg);
+      const diveMode = c.dive_mode === "CCR" ? "CCR" : (c.dive_mode === "OC" ? "OC" : null);
+      if (!diveMode || !Array.isArray(c.segments) || !c.segments.length) return null;
+      const depthUnits = c.depth_units === "meters" ? "meters" : "feet";
+      const maxD = depthUnits === "feet" ? 1000 : 305;
+      const seg0 = c.segments[0];
+      const depth = Number(seg0 && seg0.depth);
+      const timeMin = Number(seg0 && seg0.time_min);
+      if (!Number.isFinite(depth) || depth <= 0 || depth > maxD || !Number.isFinite(timeMin) || timeMin <= 0) {
+        return null;
+      }
+      const clampNum = (v, minV, maxV, defV) => {
+        const n = Number(v);
+        return Number.isFinite(n) && n >= minV && n <= maxV ? n : defV;
+      };
+      const gfLow = clampNum(c.gf_low, 1, 100, 30);
+      const gfHigh = Math.max(gfLow, clampNum(c.gf_high, 1, 100, 85));
+      const ocGases = Array.isArray(c.oc_gases)
+        ? c.oc_gases.map(g => sanitizeImportedGas(g, "bottom")).filter(Boolean)
+        : [];
+      const bailoutGases = Array.isArray(c.bailout_gases)
+        ? c.bailout_gases.map(g => sanitizeImportedGas(g, "bailout")).filter(Boolean)
+        : [];
+      const ccrDil = c.ccr_diluent ? sanitizeImportedGas(c.ccr_diluent, "diluent") : null;
+      return {
+        dive_mode: diveMode,
+        include_bailout: c.include_bailout !== false,
+        zhl16c_comp1_variant: c.zhl16c_comp1_variant === "1" ? "1" : "1b",
+        gf_low: gfLow,
+        gf_high: gfHigh,
+        o2_narcotic: c.o2_narcotic !== false,
+        depth_units: depthUnits,
+        volume_units: c.volume_units === "liters" ? "liters" : "cuft",
+        pressure_units: c.pressure_units === "bar" ? "bar" : "psi",
+        setpoint_units: c.setpoint_units === "BAR" ? "BAR" : "ATA",
+        elevation_ft: clampNum(c.elevation_ft, 0, 15000, 0),
+        water_type: c.water_type === "fresh" ? "fresh" : "salt",
+        stop_size: clampNum(c.stop_size, 1, 50, depthUnits === "meters" ? 3 : 10),
+        last_oc_stop: clampNum(c.last_oc_stop, 1, 50, depthUnits === "meters" ? 3 : 10),
+        last_ccr_stop: clampNum(c.last_ccr_stop, 1, 50, depthUnits === "meters" ? 3 : 10),
+        min_stop_time_sec: Math.round(clampNum(c.min_stop_time_sec, 1, 60, 60)),
+        descent_rate: clampNum(c.descent_rate, 1, 200, depthUnits === "meters" ? 18 : 60),
+        ascent_rate: clampNum(c.ascent_rate, 1, 200, depthUnits === "meters" ? 9 : 30),
+        deco_ascent_rate: clampNum(c.deco_ascent_rate, 1, 200, depthUnits === "meters" ? 9 : 30),
+        surface_ascent_rate: clampNum(c.surface_ascent_rate, 1, 100, depthUnits === "meters" ? 3 : 10),
+        bottom_rmv: clampNum(c.bottom_rmv, 0.1, 100, depthUnits === "meters" ? 20.0 : 0.75),
+        deco_rmv: clampNum(c.deco_rmv, 0.1, 100, depthUnits === "meters" ? 16.0 : 0.60),
+        ccr_setpoint_bottom: clampNum(c.ccr_setpoint_bottom, 0.4, 1.6, 1.2),
+        ccr_setpoint_deco: clampNum(c.ccr_setpoint_deco, 0.4, 1.6, 1.3),
+        segments: [{ depth, time_min: timeMin, gas_name: String((seg0 && seg0.gas_name) || "").slice(0, 64) }],
+        oc_gases: ocGases,
+        ccr_diluent: ccrDil,
+        bailout_gases: bailoutGases
+      };
     }
 
     function importProfilesJson(event) {
       const file = event.target.files && event.target.files[0];
       if (!file) return;
+      if (file.size > MAX_IMPORT_BYTES) {
+        flashProfileStatus("[IMPORT FILE EXCEEDS 1 MB LIMIT]", true);
+        event.target.value = "";
+        return;
+      }
       const reader = new FileReader();
       reader.onload = function(evt) {
         try {
-          const parsed = JSON.parse(evt.target.result);
+          const parsed = stripUnsafeKeys(JSON.parse(evt.target.result));
           const incoming = Array.isArray(parsed.profiles) ? parsed.profiles : (parsed.config ? [parsed] : []);
           if (!incoming.length) {
-            flashProfileStatus("INVALID PROFILE JSON", true);
+            flashProfileStatus("[INVALID PROFILE JSON]", true);
             return;
           }
           const customList = getCustomProfiles();
           let firstId = null;
-          incoming.forEach((item, idx) => {
-            const cfg = item.config || (item.plan && item.plan.config);
+          let importedCount = 0;
+          incoming.slice(0, 50).forEach((item, idx) => {
+            const rawCfg = item && (item.config || (item.plan && item.plan.config));
+            const cfg = sanitizeImportedConfig(rawCfg);
             if (!cfg) return;
-            const pid = item.profile_id || ("imported-profile-" + (idx + 1));
+            const rawId = String(item.profile_id || ("imported-profile-" + (idx + 1))).replace(/[^a-zA-Z0-9_-]+/g, "-").slice(0, 64);
+            const pid = rawId || ("imported-profile-" + (idx + 1));
             if (!firstId) firstId = pid;
-            const title = item.title || pid;
+            const title = String(item.title || pid).trim().slice(0, 120) || pid;
             const newEntry = { profile_id: pid, title, scenario_type: "Imported Profile", config: cfg };
             const existIdx = customList.findIndex(p => p.profile_id === pid);
             if (existIdx >= 0) customList[existIdx] = newEntry;
             else customList.unshift(newEntry);
+            importedCount += 1;
           });
+          if (!importedCount) {
+            flashProfileStatus("[NO VALID PROFILES FOUND]", true);
+            return;
+          }
           saveCustomProfiles(customList);
           if (firstId) {
             populatePresetDropdown(firstId);
             loadBenchmarkPreset(firstId);
-            flashProfileStatus("IMPORTED PROFILES");
+            flashProfileStatus("[IMPORTED PROFILES]");
           }
         } catch (err) {
-          flashProfileStatus("JSON PARSE ERROR", true);
+          flashProfileStatus("[JSON PARSE ERROR]", true);
+        } finally {
+          event.target.value = "";
         }
       };
       reader.readAsText(file);
@@ -2819,11 +3146,19 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       appState.depthUnits = c.depth_units;
       appState.volumeUnits = c.volume_units;
 
-      document.getElementById("mode-btn-oc").classList.toggle("active", c.dive_mode === "OC");
-      document.getElementById("mode-btn-ccr").classList.toggle("active", c.dive_mode === "CCR");
+      const btnOc = document.getElementById("mode-btn-oc");
+      const btnCcr = document.getElementById("mode-btn-ccr");
+      btnOc.classList.toggle("active", c.dive_mode === "OC");
+      btnOc.setAttribute("aria-pressed", c.dive_mode === "OC" ? "true" : "false");
+      btnCcr.classList.toggle("active", c.dive_mode === "CCR");
+      btnCcr.setAttribute("aria-pressed", c.dive_mode === "CCR" ? "true" : "false");
       document.getElementById("bailout-view-toggle").style.display = c.dive_mode === "CCR" ? "inline-flex" : "none";
-      document.getElementById("unit-btn-feet").classList.toggle("active", c.depth_units === "feet");
-      document.getElementById("unit-btn-meters").classList.toggle("active", c.depth_units === "meters");
+      const btnFeet = document.getElementById("unit-btn-feet");
+      const btnMeters = document.getElementById("unit-btn-meters");
+      btnFeet.classList.toggle("active", c.depth_units === "feet");
+      btnFeet.setAttribute("aria-pressed", c.depth_units === "feet" ? "true" : "false");
+      btnMeters.classList.toggle("active", c.depth_units === "meters");
+      btnMeters.setAttribute("aria-pressed", c.depth_units === "meters" ? "true" : "false");
       document.querySelectorAll(".unit-depth-lbl").forEach(el => { el.textContent = c.depth_units === "meters" ? "m" : "ft"; });
 
       document.getElementById("input-depth").value = c.segments[0].depth;

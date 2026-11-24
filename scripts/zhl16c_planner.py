@@ -134,6 +134,20 @@ class DivePlannerValidationError(ValueError):
         self.message = message
 
 
+def _require_finite(name: str, value: Any, code: str = "ERR_NUMERIC") -> float:
+    """Validates that a numeric parameter is a finite real number (rejecting NaN, Inf, and booleans)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise DivePlannerValidationError(
+            code, f"Parameter '{name}' must be a finite number, got {type(value).__name__}."
+        )
+    fval = float(value)
+    if not math.isfinite(fval):
+        raise DivePlannerValidationError(
+            code, f"Parameter '{name}' must be finite, got {value}."
+        )
+    return fval
+
+
 def get_zhl16c_table(
     comp1_variant: str = "1b",
 ) -> List[Tuple[str, float, float, float, float, float, float]]:
@@ -164,6 +178,7 @@ def get_hydrostatic_gradient_bar(depth_units: str = "feet", water_type: str = "s
 
 def surface_pressure_bar(elevation_ft: float = 0.0) -> float:
     """Computes ISA barometric surface pressure in bar for an elevation in feet."""
+    elevation_ft = _require_finite("elevation_ft", elevation_ft, "ERR_ELEVATION")
     if elevation_ft < 0.0 or elevation_ft > 15000.0:
         raise DivePlannerValidationError(
             "ERR_ELEVATION",
@@ -180,6 +195,8 @@ def depth_to_ambient_bar(
     water_type: str = "salt",
 ) -> float:
     """Converts gauge depth to absolute ambient pressure in bar."""
+    depth = _require_finite("depth", depth, "ERR_DEPTH_TIME")
+    p_surf_bar = _require_finite("p_surf_bar", p_surf_bar, "ERR_PRESSURE")
     if depth < -1e-6:
         raise DivePlannerValidationError("ERR_DEPTH_TIME", f"Depth cannot be negative: {depth}.")
     k = get_hydrostatic_gradient_bar(depth_units, water_type)
@@ -199,6 +216,8 @@ def ambient_bar_to_depth(
 
 def validate_gas_fractions(f_o2: float, f_he: float, label: str = "Gas") -> float:
     """Validates O2 and He fractions and returns the N2 fraction."""
+    f_o2 = _require_finite(f"{label}.f_o2", f_o2, "ERR_GAS_FRACTIONS")
+    f_he = _require_finite(f"{label}.f_he", f_he, "ERR_GAS_FRACTIONS")
     if f_o2 < 0.01 or f_o2 > 1.000001:
         raise DivePlannerValidationError(
             "ERR_GAS_FRACTIONS", f"{label} oxygen fraction must be in [0.01, 1.0], got {f_o2:.4f}."
@@ -562,10 +581,18 @@ def calculate_best_mix_for_depth(
     water_type: str = "salt",
 ) -> Dict[str, Any]:
     """Tool 2: Computes Best Nitrox, Best Trimix, and closest Standard Agency Mix for depth."""
+    depth = _require_finite("depth", depth, "ERR_DEPTH_TIME")
+    max_po2_ata = _require_finite("max_po2_ata", max_po2_ata, "ERR_PO2")
+    max_end = _require_finite("max_end", max_end, "ERR_DEPTH_TIME")
+    max_density_g_l = _require_finite("max_density_g_l", max_density_g_l, "ERR_NUMERIC")
     if depth <= 0.0:
         raise DivePlannerValidationError("ERR_DEPTH_TIME", f"Target depth must be > 0, got {depth}.")
     if max_po2_ata <= 0.16 or max_po2_ata > 2.0:
         raise DivePlannerValidationError("ERR_PO2", f"Invalid max_po2_ata: {max_po2_ata}.")
+    if max_end <= 0.0:
+        raise DivePlannerValidationError("ERR_DEPTH_TIME", f"max_end must be > 0, got {max_end}.")
+    if max_density_g_l <= 0.0:
+        raise DivePlannerValidationError("ERR_NUMERIC", f"max_density_g_l must be > 0, got {max_density_g_l}.")
 
     p_surf = surface_pressure_bar(elevation_ft)
     k = get_hydrostatic_gradient_bar(depth_units, water_type)
@@ -709,6 +736,7 @@ def calculate_cylinder_fill_capacity(
 ) -> Dict[str, Any]:
     """Tool 3 Mode D: Calculates Ideal and Real-Gas (Z-factor) deliverable volume of a cylinder."""
     validate_gas_fractions(f_o2, f_he)
+    fill_pressure = _require_finite("fill_pressure", fill_pressure, "ERR_PRESSURE")
     if fill_pressure <= 0.0:
         raise DivePlannerValidationError("ERR_PRESSURE", f"Fill pressure must be > 0, got {fill_pressure}.")
 
@@ -769,6 +797,8 @@ def calculate_gas_blender(
     target_f_n2 = validate_gas_fractions(target_f_o2, target_f_he, "Target Gas")
     topup_f_n2 = validate_gas_fractions(topup_f_o2, topup_f_he, "Top-Up Gas")
 
+    start_pressure = _require_finite("start_pressure", start_pressure, "ERR_PRESSURE")
+    target_pressure = _require_finite("target_pressure", target_pressure, "ERR_PRESSURE")
     if start_pressure < 0.0 or target_pressure <= 0.0:
         raise DivePlannerValidationError(
             "ERR_PRESSURE",
@@ -954,16 +984,52 @@ class DiveConfig:
     def validate(self) -> None:
         if self.dive_mode not in ("OC", "CCR"):
             raise DivePlannerValidationError("ERR_MODE", f"Invalid dive_mode: {self.dive_mode}")
-        if self.gf_low < 1.0 or self.gf_high > 100.0 or self.gf_low > self.gf_high:
+        if self.zhl16c_comp1_variant not in ("1b", "1"):
+            raise DivePlannerValidationError(
+                "ERR_COMP1_VARIANT",
+                f"Unsupported ZH-L16C compartment 1 variant '{self.zhl16c_comp1_variant}'. Must be '1b' or '1'.",
+            )
+        if self.depth_units not in ("feet", "meters"):
+            raise DivePlannerValidationError("ERR_UNITS", f"Invalid depth_units: {self.depth_units}")
+        if self.volume_units not in ("cuft", "liters"):
+            raise DivePlannerValidationError("ERR_UNITS", f"Invalid volume_units: {self.volume_units}")
+        if self.pressure_units not in ("psi", "bar"):
+            raise DivePlannerValidationError("ERR_UNITS", f"Invalid pressure_units: {self.pressure_units}")
+        if self.setpoint_units not in ("ATA", "BAR"):
+            raise DivePlannerValidationError("ERR_UNITS", f"Invalid setpoint_units: {self.setpoint_units}")
+        if self.water_type not in ("salt", "fresh"):
+            raise DivePlannerValidationError("ERR_WATER_TYPE", f"Invalid water_type: {self.water_type}")
+
+        gf_low = _require_finite("gf_low", self.gf_low, "ERR_GF_RANGE")
+        gf_high = _require_finite("gf_high", self.gf_high, "ERR_GF_RANGE")
+        if gf_low < 1.0 or gf_high > 100.0 or gf_low > gf_high:
             raise DivePlannerValidationError(
                 "ERR_GF_RANGE",
-                f"Invalid Gradient Factors: GF Low ({self.gf_low}%) must be in [1, GF High] and GF High ({self.gf_high}%) <= 100%.",
+                f"Invalid Gradient Factors: GF Low ({gf_low}%) must be in [1, GF High] and GF High ({gf_high}%) <= 100%.",
             )
-        if not (1 <= int(self.min_stop_time_sec) <= 60):
+
+        if isinstance(self.min_stop_time_sec, bool) or not isinstance(self.min_stop_time_sec, int):
+            raise DivePlannerValidationError(
+                "ERR_STOP_INTERVAL",
+                f"min_stop_time_sec must be an integer between 1 and 60, got {self.min_stop_time_sec!r}.",
+            )
+        if not (1 <= self.min_stop_time_sec <= 60):
             raise DivePlannerValidationError(
                 "ERR_STOP_INTERVAL",
                 f"min_stop_time_sec must be between 1s minimum and 60s (1 min) maximum, got {self.min_stop_time_sec}.",
             )
+
+        for sp_name, sp_val in [
+            ("ccr_setpoint_bottom", self.ccr_setpoint_bottom),
+            ("ccr_setpoint_deco", self.ccr_setpoint_deco),
+        ]:
+            sp_num = _require_finite(sp_name, sp_val, "ERR_SETPOINT")
+            if sp_num < 0.40 or sp_num > 1.60:
+                raise DivePlannerValidationError(
+                    "ERR_SETPOINT",
+                    f"Parameter '{sp_name}' must be within [0.40, 1.60], got {sp_num}.",
+                )
+
         for rate_name, rate_val in [
             ("descent_rate", self.descent_rate),
             ("ascent_rate", self.ascent_rate),
@@ -975,21 +1041,44 @@ class DiveConfig:
             ("bottom_rmv", self.bottom_rmv),
             ("deco_rmv", self.deco_rmv),
         ]:
-            if rate_val <= 0.0:
+            num_val = _require_finite(rate_name, rate_val, "ERR_KINEMATIC_RATE")
+            if num_val <= 0.0:
                 raise DivePlannerValidationError(
-                    "ERR_KINEMATIC_RATE", f"Parameter '{rate_name}' must be > 0, got {rate_val}."
+                    "ERR_KINEMATIC_RATE", f"Parameter '{rate_name}' must be > 0, got {num_val}."
                 )
+
         if not self.segments:
             raise DivePlannerValidationError("ERR_DEPTH_TIME", "At least one dive segment is required.")
         max_allowed_depth = 1000.0 if self.depth_units == "feet" else 305.0
         for idx, seg in enumerate(self.segments):
-            d = float(seg.get("depth", -1))
-            t = float(seg.get("time_min", -1))
+            if not isinstance(seg, dict):
+                raise DivePlannerValidationError("ERR_DEPTH_TIME", f"Segment {idx} must be an object.")
+            d = _require_finite(f"segments[{idx}].depth", seg.get("depth", -1), "ERR_DEPTH_TIME")
+            t = _require_finite(f"segments[{idx}].time_min", seg.get("time_min", -1), "ERR_DEPTH_TIME")
             if d <= 0.0 or d > max_allowed_depth or t <= 0.0:
                 raise DivePlannerValidationError(
                     "ERR_DEPTH_TIME",
                     f"Segment {idx} has invalid depth ({d}) or time_min ({t}).",
                 )
+
+        all_gases: List[GasMix] = list(self.oc_gases) + list(self.bailout_gases)
+        if self.ccr_diluent is not None:
+            all_gases.append(self.ccr_diluent)
+        for gas in all_gases:
+            validate_gas_fractions(gas.f_o2, gas.f_he, gas.name or "Gas")
+            if gas.role not in ("bottom", "travel", "deco", "diluent", "bailout"):
+                raise DivePlannerValidationError("ERR_GAS_ROLE", f"Invalid gas role '{gas.role}' for '{gas.name}'.")
+            max_po2 = _require_finite(f"{gas.name}.max_po2", gas.max_po2, "ERR_PO2")
+            if max_po2 < 0.5 or max_po2 > 2.0:
+                raise DivePlannerValidationError("ERR_PO2", f"Gas '{gas.name}' max_po2 must be in [0.5, 2.0], got {max_po2}.")
+            start_psi = _require_finite(f"{gas.name}.start_pressure_psi", gas.start_pressure_psi, "ERR_PRESSURE")
+            if start_psi <= 0.0:
+                raise DivePlannerValidationError("ERR_PRESSURE", f"Gas '{gas.name}' start_pressure_psi must be > 0, got {start_psi}.")
+            if gas.switch_depth is not None:
+                sw = _require_finite(f"{gas.name}.switch_depth", gas.switch_depth, "ERR_DEPTH_TIME")
+                if sw < 0.0:
+                    raise DivePlannerValidationError("ERR_DEPTH_TIME", f"Gas '{gas.name}' switch_depth must be >= 0, got {sw}.")
+
         surface_pressure_bar(self.elevation_ft)
 
 
@@ -1757,6 +1846,17 @@ def solve_max_time_at_depth(
 ) -> Dict[str, Any]:
     """Variant 3A: Solves for NDL, Tank-Limited Max Bottom Time, and CNS-Limited Bottom Time at depth."""
     validate_gas_fractions(f_o2, f_he)
+    depth = _require_finite("depth", depth, "ERR_DEPTH_TIME")
+    if depth <= 0.0:
+        raise DivePlannerValidationError("ERR_DEPTH_TIME", f"Target depth must be > 0, got {depth}.")
+    if reserve_rule not in ("thirds", "half", "all"):
+        raise DivePlannerValidationError("ERR_RESERVE_RULE", f"Invalid reserve_rule: {reserve_rule}")
+    if volume_units not in ("cuft", "liters"):
+        raise DivePlannerValidationError("ERR_UNITS", f"Invalid volume_units: {volume_units}")
+    bottom_rmv = _require_finite("bottom_rmv", bottom_rmv, "ERR_KINEMATIC_RATE")
+    deco_rmv = _require_finite("deco_rmv", deco_rmv, "ERR_KINEMATIC_RATE")
+    if bottom_rmv <= 0.0 or deco_rmv <= 0.0:
+        raise DivePlannerValidationError("ERR_KINEMATIC_RATE", "RMV values must be > 0.")
     cap = calculate_cylinder_fill_capacity(
         cylinder_preset=cylinder_preset,
         fill_pressure=fill_pressure_psi,
@@ -1867,6 +1967,19 @@ def solve_max_depth_envelope(
 ) -> Dict[str, Any]:
     """Variant 2: Given tank size and gas type, calculates how deep the diver can safely go."""
     validate_gas_fractions(f_o2, f_he)
+    max_po2_ata = _require_finite("max_po2_ata", max_po2_ata, "ERR_PO2")
+    max_end = _require_finite("max_end", max_end, "ERR_DEPTH_TIME")
+    min_practical_bottom_time_min = _require_finite(
+        "min_practical_bottom_time_min", min_practical_bottom_time_min, "ERR_DEPTH_TIME"
+    )
+    if max_po2_ata <= 0.16 or max_po2_ata > 2.0:
+        raise DivePlannerValidationError("ERR_PO2", f"Invalid max_po2_ata: {max_po2_ata}.")
+    if max_end <= 0.0 or min_practical_bottom_time_min <= 0.0:
+        raise DivePlannerValidationError("ERR_DEPTH_TIME", "max_end and min_practical_bottom_time_min must be > 0.")
+    if reserve_rule not in ("thirds", "half", "all"):
+        raise DivePlannerValidationError("ERR_RESERVE_RULE", f"Invalid reserve_rule: {reserve_rule}")
+    if volume_units not in ("cuft", "liters"):
+        raise DivePlannerValidationError("ERR_UNITS", f"Invalid volume_units: {volume_units}")
     props = calculate_ead_end_mod_density(
         depth=100.0 if depth_units == "feet" else 30.0,
         f_o2=f_o2,
@@ -1982,6 +2095,20 @@ def solve_rock_bottom(
     volume_units: str = "cuft",
 ) -> Dict[str, Any]:
     """Variant 3B: Computes Minimum Gas ('Rock Bottom') and Turn Pressure for team gas sharing."""
+    depth = _require_finite("depth", depth, "ERR_DEPTH_TIME")
+    bottom_time_min = _require_finite("bottom_time_min", bottom_time_min, "ERR_DEPTH_TIME")
+    first_switch_depth = _require_finite("first_switch_depth", first_switch_depth, "ERR_DEPTH_TIME")
+    stressed_rmv_per_diver = _require_finite("stressed_rmv_per_diver", stressed_rmv_per_diver, "ERR_KINEMATIC_RATE")
+    problem_solving_time_min = _require_finite("problem_solving_time_min", problem_solving_time_min, "ERR_DEPTH_TIME")
+    ascent_rate = _require_finite("ascent_rate", ascent_rate, "ERR_KINEMATIC_RATE")
+    if depth <= 0.0 or bottom_time_min <= 0.0 or first_switch_depth < 0.0 or problem_solving_time_min < 0.0:
+        raise DivePlannerValidationError("ERR_DEPTH_TIME", "Invalid depth or time inputs for rock-bottom calculation.")
+    if ascent_rate <= 0.0 or stressed_rmv_per_diver <= 0.0:
+        raise DivePlannerValidationError("ERR_KINEMATIC_RATE", "ascent_rate and stressed_rmv_per_diver must be > 0.")
+    if isinstance(num_divers_sharing, bool) or not isinstance(num_divers_sharing, int) or num_divers_sharing < 1:
+        raise DivePlannerValidationError("ERR_NUMERIC", "num_divers_sharing must be an integer >= 1.")
+    if volume_units not in ("cuft", "liters"):
+        raise DivePlannerValidationError("ERR_UNITS", f"Invalid volume_units: {volume_units}")
     p_surf = surface_pressure_bar(elevation_ft)
     k = get_hydrostatic_gradient_bar(depth_units, water_type="salt")
     p_bottom = p_surf + depth * k
@@ -2083,6 +2210,7 @@ def solve_repetitive_dive(
     dive2_cfg: DiveConfig,
 ) -> Dict[str, Any]:
     """Variant 3D: Evolves Dive 1 -> Surface Interval (Haldane + 90m CNS decay) -> Dive 2."""
+    surface_interval_min = _require_finite("surface_interval_min", surface_interval_min, "ERR_SI")
     if surface_interval_min < 0.0:
         raise DivePlannerValidationError("ERR_SI", f"Surface interval must be >= 0, got {surface_interval_min}.")
 
@@ -2233,13 +2361,41 @@ def solve_ccr_bailout_sizing(
     }
 
 
+ALLOWED_GAS_KEYS = {
+    "name", "f_o2", "f_he", "role", "max_po2", "switch_depth",
+    "cylinder_preset", "start_pressure_psi", "enabled",
+}
+ALLOWED_SEGMENT_KEYS = {"depth", "time_min", "gas_name"}
+
+
+def _gas_mix_from_dict(raw_gas: Any, field_name: str, default_role: Optional[str] = None) -> GasMix:
+    """Validates a raw gas dictionary against GasMix schema fields and rejects undefined keys."""
+    if not isinstance(raw_gas, dict):
+        raise DivePlannerValidationError("ERR_GAS_FRACTIONS", f"'{field_name}' entry must be an object.")
+    unknown_keys = sorted(set(raw_gas.keys()) - ALLOWED_GAS_KEYS)
+    if unknown_keys:
+        raise DivePlannerValidationError(
+            "ERR_UNKNOWN_KEY",
+            f"Undefined key(s) in '{field_name}': {', '.join(unknown_keys)}.",
+        )
+    for req_key in ("name", "f_o2", "f_he"):
+        if req_key not in raw_gas:
+            raise DivePlannerValidationError(
+                "ERR_GAS_FRACTIONS",
+                f"Missing required key '{req_key}' in '{field_name}'.",
+            )
+    gas_kwargs = dict(raw_gas)
+    if "role" not in gas_kwargs and default_role is not None:
+        gas_kwargs["role"] = default_role
+    return GasMix(**gas_kwargs)
+
+
 def config_from_dict(data: Dict[str, Any]) -> DiveConfig:
-    """Constructs a validated DiveConfig instance from a raw dictionary."""
-    oc_gases = [GasMix(**g) for g in data.get("oc_gases", [])]
-    bailout_gases = [GasMix(**g) for g in data.get("bailout_gases", [])]
-    dil_raw = data.get("ccr_diluent")
-    ccr_dil = GasMix(**dil_raw) if isinstance(dil_raw, dict) else None
-    allowed_keys = {
+    """Constructs a validated DiveConfig instance from a raw dictionary, rejecting undefined keys."""
+    if not isinstance(data, dict):
+        raise DivePlannerValidationError("ERR_MALFORMED_JSON", "Dive configuration must be a JSON object.")
+
+    allowed_scalar_keys = {
         "dive_mode", "include_bailout", "zhl16c_comp1_variant", "gf_low", "gf_high",
         "o2_narcotic", "depth_units", "volume_units", "pressure_units", "setpoint_units",
         "elevation_ft", "water_type", "stop_size", "last_oc_stop", "last_ccr_stop",
@@ -2247,11 +2403,50 @@ def config_from_dict(data: Dict[str, Any]) -> DiveConfig:
         "surface_ascent_rate", "bottom_rmv", "deco_rmv", "ccr_setpoint_bottom",
         "ccr_setpoint_deco", "segments",
     }
-    kwargs = {k: v for k, v in data.items() if k in allowed_keys}
+    allowed_top_keys = allowed_scalar_keys | {"oc_gases", "bailout_gases", "ccr_diluent"}
+    unknown_top_keys = sorted(set(data.keys()) - allowed_top_keys)
+    if unknown_top_keys:
+        raise DivePlannerValidationError(
+            "ERR_UNKNOWN_KEY",
+            f"Undefined configuration key(s): {', '.join(unknown_top_keys)}.",
+        )
+
+    oc_raw = data.get("oc_gases", [])
+    if not isinstance(oc_raw, list):
+        raise DivePlannerValidationError("ERR_GAS_FRACTIONS", "'oc_gases' must be a list.")
+    oc_gases = [_gas_mix_from_dict(g, f"oc_gases[{i}]") for i, g in enumerate(oc_raw)]
+
+    bo_raw = data.get("bailout_gases", [])
+    if not isinstance(bo_raw, list):
+        raise DivePlannerValidationError("ERR_GAS_FRACTIONS", "'bailout_gases' must be a list.")
+    bailout_gases = [_gas_mix_from_dict(g, f"bailout_gases[{i}]", default_role="bailout") for i, g in enumerate(bo_raw)]
+
+    dil_raw = data.get("ccr_diluent")
+    if dil_raw is not None:
+        ccr_dil: Optional[GasMix] = _gas_mix_from_dict(dil_raw, "ccr_diluent", default_role="diluent")
+    else:
+        ccr_dil = None
+
+    if "segments" in data:
+        if not isinstance(data["segments"], list):
+            raise DivePlannerValidationError("ERR_DEPTH_TIME", "'segments' must be a list.")
+        for idx, seg in enumerate(data["segments"]):
+            if not isinstance(seg, dict):
+                raise DivePlannerValidationError("ERR_DEPTH_TIME", f"Segment {idx} must be an object.")
+            unknown_seg_keys = sorted(set(seg.keys()) - ALLOWED_SEGMENT_KEYS)
+            if unknown_seg_keys:
+                raise DivePlannerValidationError(
+                    "ERR_UNKNOWN_KEY",
+                    f"Undefined key(s) in segments[{idx}]: {', '.join(unknown_seg_keys)}.",
+                )
+
+    kwargs = {k: v for k, v in data.items() if k in allowed_scalar_keys}
     kwargs["oc_gases"] = oc_gases
     kwargs["bailout_gases"] = bailout_gases
     kwargs["ccr_diluent"] = ccr_dil
-    return DiveConfig(**kwargs)
+    cfg = DiveConfig(**kwargs)
+    cfg.validate()
+    return cfg
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -2266,13 +2461,30 @@ def _to_relative_path_str(p: Path) -> str:
         return p.name
 
 
+def _read_json_file(target_path: Path) -> Dict[str, Any]:
+    """Reads and parses a JSON object file, raising structured ERR_MALFORMED_JSON on parse errors."""
+    rel_str = _to_relative_path_str(target_path)
+    try:
+        parsed = json.loads(target_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise DivePlannerValidationError(
+            "ERR_MALFORMED_JSON", f"Failed to parse JSON from {rel_str}: {exc}"
+        ) from exc
+    if not isinstance(parsed, dict):
+        raise DivePlannerValidationError(
+            "ERR_MALFORMED_JSON", f"Expected top-level JSON object in {rel_str}."
+        )
+    return parsed
+
+
 def _rebuild_dashboard_if_present() -> bool:
     """Regenerates dashboard.html when the default profile store is updated."""
     try:
         from scripts import build_dashboard
         build_dashboard.main()
         return True
-    except Exception:
+    except Exception as exc:
+        LOGGER.warning("Dashboard rebuild failed: %s", exc)
         return False
 
 
@@ -2282,7 +2494,7 @@ def list_saved_profiles(profiles_file: Optional[Path] = None) -> Dict[str, Any]:
     rel_str = _to_relative_path_str(target_path)
     if not target_path.exists():
         return {"profiles_file": rel_str, "count": 0, "profiles": []}
-    raw = json.loads(target_path.read_text(encoding="utf-8"))
+    raw = _read_json_file(target_path)
     summary_list: List[Dict[str, Any]] = []
     for item in raw.get("profiles", []):
         cfg = item.get("config", {})
@@ -2320,7 +2532,7 @@ def save_profile_to_store(
 
     target_path = profiles_file or DEFAULT_PROFILES_PATH
     if target_path.exists():
-        raw = json.loads(target_path.read_text(encoding="utf-8"))
+        raw = _read_json_file(target_path)
     else:
         raw = {
             "dataset_name": "technical_dive_profiles_v2",
@@ -2392,7 +2604,7 @@ def delete_profile_from_store(
     rel_str = _to_relative_path_str(target_path)
     if not target_path.exists():
         raise DivePlannerValidationError("ERR_FILE_NOT_FOUND", f"Profiles file not found: {rel_str}")
-    raw = json.loads(target_path.read_text(encoding="utf-8"))
+    raw = _read_json_file(target_path)
     before = len(raw.get("profiles", []))
     remaining = [p for p in raw.get("profiles", []) if p.get("profile_id") != profile_id]
     if len(remaining) == before:
@@ -2703,12 +2915,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             if args.input_file or args.profile_id:
                 in_path = Path(args.input_file) if args.input_file else prof_store_path
                 if not in_path.exists():
-                    raise DivePlannerValidationError("ERR_FILE_NOT_FOUND", f"Input file not found: {in_path}")
-                try:
-                    raw = json.loads(in_path.read_text(encoding="utf-8"))
-                except Exception as exc:
-                    print(f"[ERR_MALFORMED_JSON] Failed to parse JSON from {in_path}: {exc}", file=sys.stderr)
-                    return 3
+                    raise DivePlannerValidationError(
+                        "ERR_FILE_NOT_FOUND",
+                        f"Input file not found: {_to_relative_path_str(in_path)}",
+                    )
+                raw = _read_json_file(in_path)
                 if "profiles" in raw and args.profile_id:
                     matched = [p["config"] for p in raw["profiles"] if p["profile_id"] == args.profile_id]
                     if not matched:
@@ -2897,6 +3108,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return 0
 
     except DivePlannerValidationError as exc:
+        if exc.code == "ERR_MALFORMED_JSON":
+            print(f"{exc}", file=sys.stderr)
+            return 3
         print(f"VALIDATION ERROR: {exc}", file=sys.stderr)
         return 2
     except Exception as exc:

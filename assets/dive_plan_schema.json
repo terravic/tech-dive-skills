@@ -133,6 +133,7 @@
       "minItems": 1,
       "items": {
         "type": "object",
+        "additionalProperties": false,
         "required": ["depth", "time_min"],
         "properties": {
           "depth": { "type": "number", "minimum": 0, "maximum": 1000 },
@@ -145,6 +146,7 @@
       "type": "array",
       "items": {
         "type": "object",
+        "additionalProperties": false,
         "required": ["name", "f_o2", "f_he"],
         "properties": {
           "name": { "type": "string" },
@@ -161,19 +163,28 @@
     },
     "ccr_diluent": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["diluent"] },
         "f_o2": { "type": "number", "minimum": 0.01, "maximum": 1.0 },
-        "f_he": { "type": "number", "minimum": 0.0, "maximum": 0.99 }
+        "f_he": { "type": "number", "minimum": 0.0, "maximum": 0.99 },
+        "max_po2": { "type": "number", "minimum": 0.5, "maximum": 2.0 },
+        "switch_depth": { "type": ["number", "null"], "minimum": 0 },
+        "cylinder_preset": { "type": "string" },
+        "start_pressure_psi": { "type": "number", "exclusiveMinimum": 0 },
+        "enabled": { "type": "boolean", "default": true }
       }
     },
     "bailout_gases": {
       "type": "array",
       "items": {
         "type": "object",
+        "additionalProperties": false,
         "required": ["name", "f_o2", "f_he"],
         "properties": {
           "name": { "type": "string" },
+          "role": { "type": "string", "enum": ["bottom", "travel", "deco", "bailout"] },
           "f_o2": { "type": "number", "minimum": 0.01, "maximum": 1.0 },
           "f_he": { "type": "number", "minimum": 0.0, "maximum": 0.99 },
           "max_po2": { "type": "number", "minimum": 0.5, "maximum": 2.0 },
@@ -185,5 +196,6 @@
       }
     }
   },
+  "additionalProperties": false,
   "required": ["dive_mode", "segments"]
 }

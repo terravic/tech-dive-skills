@@ -193,6 +193,117 @@ class TestSystemEndToEnd(unittest.TestCase):
         listed = p.list_saved_profiles()
         self.assertEqual(listed["profiles_file"], "assets/synthetic_dive_profiles.json")
 
+        # Verify legal draft templates exist and carry required legal-review banner
+        for legal_name in ["privacy.md", "terms.md", "refunds.md", "cookies.md"]:
+            legal_path = PROJECT_ROOT / "legal" / legal_name
+            self.assertTrue(legal_path.exists(), msg=f"Missing legal draft: legal/{legal_name}")
+            legal_text = legal_path.read_text(encoding="utf-8")
+            self.assertIn("DRAFT — REQUIRES LEGAL REVIEW", legal_text)
+
+    def test_dashboard_security_csp_xss_and_wcag_compliance(self) -> None:
+        # 1. Verify script-tag breakout escaping in embedded JSON
+        malicious = {
+            "profiles": [
+                {"profile_id": "xss-test", "title": "</script><script>alert(1)</script>"}
+            ],
+            "standard_cylinders": p.STANDARD_CYLINDERS,
+            "standard_agency_mixes": p.STANDARD_AGENCY_MIXES,
+        }
+        rendered = build_dashboard.generate_dashboard_html(malicious)
+        self.assertNotIn("</script><script>alert(1)</script>", rendered)
+        self.assertIn("\\u003c/script\\u003e\\u003cscript\\u003ealert(1)\\u003c/script\\u003e", rendered)
+
+        # 2. Verify CSP, offline isolation, XSS helpers, local erasure, and WCAG controls
+        html = (PROJECT_ROOT / "dashboard.html").read_text(encoding="utf-8")
+        for required_security_or_a11y in [
+            'http-equiv="Content-Security-Policy"',
+            "default-src 'none'",
+            "connect-src 'none'",
+            'name="referrer" content="no-referrer"',
+            "function escapeHtml(",
+            "function sanitizeImportedConfig(",
+            "function clearAllLocalData(",
+            "function handleTablistKeydown(",
+            "function handleChartKeydown(",
+            'class="skip-link"',
+            ":focus-visible",
+            "<footer ",
+            'role="progressbar"',
+            'id="btn-clear-local-data"',
+        ]:
+            self.assertIn(required_security_or_a11y, html, msg=f"Missing hardened dashboard token: {required_security_or_a11y}")
+
+        # Verify zero external URLs and zero SVG icons inside theme switcher
+        self.assertNotIn("http://", html)
+        self.assertNotIn("https://", html)
+        theme_start = html.index('class="theme-switcher"')
+        theme_end = html.index("</div>", theme_start)
+        self.assertNotIn("<svg", html[theme_start:theme_end])
+
+        # 3. Verify WCAG 2.2 AA contrast ratios (>= 4.5:1 text, >= 3.0:1 UI control borders)
+        def _contrast(h1: str, h2: str) -> float:
+            def _lum(hx: str) -> float:
+                rgb = [int(hx.lstrip("#")[i:i + 2], 16) / 255.0 for i in (0, 2, 4)]
+                lin = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in rgb]
+                return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+            l1, l2 = _lum(h1), _lum(h2)
+            return (max(l1, l2) + 0.05) / (min(l1, l2) + 0.05)
+
+        text_pairs = [
+            ("#1C1917", "#FFFFFF"),
+            ("#57534E", "#FAFAF9"),
+            ("#57534E", "#F5F5F4"),
+            ("#0F766E", "#FFFFFF"),
+            ("#B45309", "#FFFFFF"),
+            ("#4338CA", "#FAFAF9"),
+            ("#047857", "#FFFFFF"),
+            ("#BE123C", "#FFFFFF"),
+            ("#ECE8E2", "#16171D"),
+            ("#9A9895", "#1E2028"),
+            ("#2DD4BF", "#16171D"),
+            ("#0D0E11", "#14B8A6"),
+            ("#0D0E11", "#F59E0B"),
+            ("#F59E0B", "#16171D"),
+            ("#818CF8", "#16171D"),
+            ("#34D399", "#16171D"),
+            ("#FB7185", "#16171D"),
+        ]
+        for fg, bg in text_pairs:
+            self.assertGreaterEqual(_contrast(fg, bg), 4.5, msg=f"WCAG AA text contrast failed for {fg} on {bg}")
+
+        control_border_pairs = [
+            ("#787774", "#FAFAF9"),
+            ("#787774", "#FFFFFF"),
+            ("#6E707A", "#16171D"),
+            ("#6E707A", "#0D0E11"),
+        ]
+        for fg, bg in control_border_pairs:
+            self.assertGreaterEqual(_contrast(fg, bg), 3.0, msg=f"WCAG AA UI border contrast failed for {fg} on {bg}")
+
+    def test_repository_hygiene_and_algorithm_preservation(self) -> None:
+        # Ensure zero local machine absolute paths and zero Unicode emojis across text files
+        abs_prefixes = ["/Users" + "/", "/home" + "/", "/usr/" + "local/", "C:" + "\\"]
+        skip_dirs = {".git", "__pycache__"}
+        for path in sorted(PROJECT_ROOT.rglob("*")):
+            if any(part in skip_dirs for part in path.parts) or not path.is_file():
+                continue
+            if path.suffix in {".png", ".pyc"}:
+                continue
+            content = path.read_text(encoding="utf-8")
+            for prefix in abs_prefixes:
+                self.assertNotIn(prefix, content, msg=f"Local absolute path found in {path.name}")
+            for ch in content:
+                codepoint = ord(ch)
+                self.assertFalse(
+                    0x1F300 <= codepoint <= 0x1FAFF or 0x2600 <= codepoint <= 0x27BF,
+                    msg=f"Decorative emoji/symbol U+{codepoint:04X} found in {path.name}",
+                )
+
+        # Ensure algorithm names and Apache 2.0 license remain preserved
+        readme_text = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+        for preserved in ["Bühlmann", "ZH-L16C", "Gradient Factors", "Haldane", "Schreiner", "NOAA", "Lambertsen", "Apache License"]:
+            self.assertIn(preserved, readme_text, msg=f"Expected preserved term missing from README.md: {preserved}")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -19,25 +19,19 @@ wheels/
 .installed.cfg
 *.egg
 
-# --- env ---
+# --- Virtual Environments ---
 .venv/
 venv/
 env/
 ENV/
-.health-venv/
 .python-version
 
-# --- C extensions ---
+# --- C Extensions ---
 *.so
 
-# --- Jupyter / Colab ---
+# --- Notebooks ---
 .ipynb_checkpoints/
 *.ipynb_checkpoints
-
-# --- Node / A2UI tooling ---
-node_modules/
-npm-debug.log*
-yarn-error.log*
 
 # --- Secrets / Credentials ---
 .env
@@ -48,24 +42,14 @@ yarn-error.log*
 *.pem
 *.key
 
-# --- Terraform ---
-.terraform/
-*.tfstate
-*.tfstate.*
-*.tfvars
-
-# --- Data ---
-*.csv
-*.parquet
-*.avro
-
-# --- Logs and scratch output ---
+# --- Logs and Temporary Output ---
 *.log
+*.out
 scratch/
 tmp/
+.cache/
 
-
-# --- OS / editor ---
+# --- OS / Editor ---
 .DS_Store
 Thumbs.db
 .idea/
@@ -74,44 +58,14 @@ Thumbs.db
 *.swo
 *~
 
-# --- Coding Agents ---
-CLAUDE.md
-.claude/
-.agents/skills/
-.agents/roles/
-.refs/
-.adk/
-
-# --- Local / Personal Notes ---
+# --- Local Notes ---
 TODO*.md
 *.local.md
 notes/
 BUILD-NOTES.md
 
-# --- Run ---
-/raw/*
-/findings/
-/gates/*
-/executive/
-!/raw/.gitkeep
-!/gates/.gitkeep
-/program-state/*
-!/program-state/project_parameters.json
-/.local/
-/governance/gates/
-*.sdf
-*.pdb
-*.pdbqt
-*.xpt
-*.h5ad
-*.bam
-*.vcf
-*.vcf.gz
-*.out
-*.log
-dashboards/*.html
-.cache/
+# --- Test Coverage ---
 .coverage
 .coverage.*
 htmlcov/
-
+.pytest_cache/

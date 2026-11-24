@@ -77,7 +77,7 @@ python3 scripts/zhl16c_planner.py plan \
 
 # Plan a CCR dive with automatic OC bailout schedule from a JSON profile
 python3 scripts/zhl16c_planner.py --json plan \
-  --profile-id syn-ccr-bailout-240ft
+  --profile-id SYNTH-CCR-BAILOUT-250FT
 
 # Plan a dive and save it directly into the UI Profile dropdown selector
 python3 scripts/zhl16c_planner.py plan \

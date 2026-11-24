@@ -24,6 +24,7 @@ All paths are relative to the project root directory:
 |-- LICENSE
 |-- PRD.md
 |-- README.md
+|-- SECURITY_AUDIT.md
 |-- SKILL.md
 |-- dashboard.html
 |-- requirements.txt
@@ -33,6 +34,11 @@ All paths are relative to the project root directory:
 |   `-- synthetic_dive_profiles.json
 |-- documents/
 |   `-- prd.md
+|-- legal/
+|   |-- cookies.md
+|   |-- privacy.md
+|   |-- refunds.md
+|   `-- terms.md
 |-- references/
 |   `-- zhl16c_math_reference.md
 |-- scripts/
@@ -49,14 +55,16 @@ All paths are relative to the project root directory:
 
 ### Directory and File Descriptions
 - `SKILL.md`: Primary skill definition, operational workflow, and CLI subcommand mapping.
-- `DESIGN.md`: Architectural visual design specification for the HTML dashboard.
+- `DESIGN.md`: Visual, accessibility, and technical specification for the HTML dashboard.
 - `PRD.md` and `documents/prd.md`: Product Requirement Document detailing user stories, technical architecture, functional/non-functional requirements, and error handling.
+- `SECURITY_AUDIT.md`: Security, sanitization, privacy, and accessibility audit register and verification log.
 - `LICENSE`: Apache License 2.0 terms and conditions governing the project.
-- `dashboard.html`: Self-contained interactive HTML5 dive planner and gas calculator dashboard.
+- `dashboard.html`: Self-contained offline interactive HTML5 dive planner and gas calculator dashboard.
 - `requirements.txt`: Python package list (core calculations use the Python Standard Library; optional test runners are listed for convenience).
-- `assets/dive_plan_schema.json`: JSON Schema defining the input configuration and output schedule structure.
+- `assets/dive_plan_schema.json`: Strict JSON Schema defining the input configuration and output schedule structure.
 - `assets/skill_overview.png`: Architectural and dashboard overview diagram illustrating the skill execution pipeline, data inputs/outputs, and interactive UI preview.
 - `assets/synthetic_dive_profiles.json`: Reference technical dive profiles and cylinder presets loaded by the CLI and dashboard.
+- `legal/privacy.md`, `legal/terms.md`, `legal/refunds.md`, `legal/cookies.md`: Draft legal policy templates marked for legal review.
 - `references/zhl16c_math_reference.md`: Mathematical reference covering ZH-L16C (`1b` and `1`) coefficients, Haldane/Schreiner equations, Gradient Factors, NOAA CNS, and Lambertsen OTU formulas.
 - `scripts/zhl16c_planner.py`: Deterministic ZH-L16C + GF decompression engine, gas utility calculators, and profile manager CLI.
 - `scripts/build_dashboard.py`: Generator script that embeds the reference profiles into `dashboard.html`.
@@ -116,18 +124,17 @@ When this skill is loaded in your agent workspace, state your dive parameters or
 
 Open `dashboard.html` in any web browser (double-click the file in your file manager). No internet connection or local server is needed. The main page is organized into two primary workspace tabs at the top of the screen:
 
-1. **Main Tab 1 (`1. Dive Planner (Profiles, Gases & Decompression Schedule)`)**:
-   - **Open or Create a Profile**: Select an existing dive profile from the top **Profile** dropdown menu, or click **`New Profile`** (`New`) to start a fresh dive plan profile.
-   - **Choose Units and Dive Mode**: Toggle between **Imperial (`FT / CUFT`)** and **Metric (`M / LITERS`)**, and switch between **`OC (Open Circuit)`** and **`CCR (Rebreather)`**.
-   - **Enter Depth, Time, and Gases**: Set your target depth and bottom time, adjust **`GF Low`** and **`GF High`**, and configure your bottom, travel, decompression, or CCR bailout cylinders in **Gas Mixes & Bailout Inventory** (or click **`Auto Best Gas + Plan`** to populate optimal gases automatically).
-   - **Review Ascent & Telemetry**: View the 4 KPI summary cards, the interactive depth and decompression ceiling chart, and the sub-tabs for **Ascent & Decompression Table**, **Cylinder Gas Logistics**, and **16-Compartment Tissue Matrix**.
-   - **Save and Recall Custom Profiles**: Type a custom name into **Profile Title** and click **`Save Profile`** (`Save`) to persist the profile in your browser's **Profile** dropdown menu. Use **Export JSON** and **Import JSON** to back up or share profile files.
-2. **Main Tab 2 (`2. Diver Utility Tools (MOD / Best Mix / Gas Blender / Rock Bottom)`)**:
+1. **Main Tab 1 (`Dive Planner`)**:
+   - **Open, Create, or Manage a Profile**: Select an existing dive profile from the top **Profile** dropdown menu, click **`New`** to initialize a fresh dive profile, **`Save`** to persist the current profile in browser `localStorage`, **`Delete`** to remove a saved profile, **`Export`** / **`Import`** to back up or load JSON profile files, or **`Clear Local Data`** to erase all locally stored profiles and theme preferences.
+   - **Choose Circuit Mode, Units, and Theme**: Switch between **`OC`** and **`CCR`**, toggle **`FT / CUFT`** vs. **`M / LITERS`**, and switch themes using the **`Light`**, **`Dark`**, and **`System`** controls.
+   - **Configure Dive Parameters**: Enter target depth and bottom time in **Dive Profile** (or click **`Auto Best Gas`**), edit cylinders and mixes in **Gas Mixes**, adjust **`GF Low`** / **`GF High`** and Compartment `1b`/`1` in **Gradient Factors & Algorithm**, and tune stops, ascent/descent rates, RMV, and altitude in **Stops, Rates & RMV**.
+   - **Review Ascent & Telemetry**: Inspect the 4 KPI summary cards, the interactive **Depth & Decompression Ceiling** SVG chart (hover with mouse or focus and use `Left`/`Right` arrow keys), and the **Decompression Schedule**, **Cylinder Gas**, and **Tissue Compartments** tabs.
+2. **Main Tab 2 (`Diver Tools`)**:
    - Switches to a dedicated full-width calculators screen with four sub-tabs:
-     - **`Tool 1 & Var 2: EAD / END / MOD & Tank Max-Depth`**: Calculates Maximum Operating Depth (`MOD`), Minimum Operating Depth (`MinOD`), Equivalent Air Depth (`EAD`), Equivalent Narcotic Depth (`END`), Maximum Narcotic Depth (`MND`), and maximum depth supported by your selected cylinder.
-     - **`Tool 2: Best Mix for Depth`**: Calculates optimal Nitrox or Trimix fractions for any target depth, $P_{\text{O}_2}$, and `END` limit.
-     - **`Tool 3: Nitrox / Trimix Blender & Fill Capacity`**: Calculates step-by-step partial-pressure gas blending (`Helium`, `Oxygen`, and `Air` top-up) and bleed-down pressures over partially full cylinders.
-     - **`Tool 4 & Var 3: Gas Density, Rock Bottom & What-If`**: Calculates two-diver emergency reserve gas ("Rock Bottom") to reach the first decompression gas switch and repetitive surface interval `CNS %` decay.
+     - **`EAD / END / MOD & Max Depth`**: Calculates Maximum Operating Depth (`MOD`), Minimum Operating Depth (`MinOD`), Equivalent Air Depth (`EAD`), Equivalent Narcotic Depth (`END`), Maximum Narcotic Depth (`MND`), and maximum depth supported by your selected cylinder.
+     - **`Best Mix`**: Calculates optimal Nitrox or Trimix fractions for any target depth, $P_{\text{O}_2}$, and `END` limit.
+     - **`Gas Blender`**: Calculates step-by-step partial-pressure gas blending (`Helium`, `Oxygen`, and `Air` top-up) and bleed-down pressures over partially full cylinders.
+     - **`Gas Density & Rock Bottom`**: Calculates two-diver emergency reserve gas ("Rock Bottom") to reach the first decompression gas switch and repetitive surface interval `CNS %` decay.
 
 ---
 

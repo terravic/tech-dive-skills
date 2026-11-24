@@ -158,6 +158,54 @@ class TestZhl16cMathematics(unittest.TestCase):
             )
         self.assertEqual(ctx5.exception.code, "ERR_BLEND_IMPOSSIBLE")
 
+    def test_strict_schema_and_finite_validation(self) -> None:
+        # Reject undefined top-level keys
+        with self.assertRaises(p.DivePlannerValidationError) as ctx_top:
+            p.config_from_dict({
+                "dive_mode": "OC",
+                "segments": [{"depth": 100, "time_min": 20}],
+                "unexpected_key": 123,
+            })
+        self.assertEqual(ctx_top.exception.code, "ERR_UNKNOWN_KEY")
+
+        # Reject undefined gas mix keys
+        with self.assertRaises(p.DivePlannerValidationError) as ctx_gas:
+            p.config_from_dict({
+                "dive_mode": "OC",
+                "segments": [{"depth": 100, "time_min": 20}],
+                "oc_gases": [{"name": "EAN32", "f_o2": 0.32, "f_he": 0.0, "extra": True}],
+            })
+        self.assertEqual(ctx_gas.exception.code, "ERR_UNKNOWN_KEY")
+
+        # Reject undefined segment keys
+        with self.assertRaises(p.DivePlannerValidationError) as ctx_seg:
+            p.config_from_dict({
+                "dive_mode": "OC",
+                "segments": [{"depth": 100, "time_min": 20, "bad_field": 1}],
+            })
+        self.assertEqual(ctx_seg.exception.code, "ERR_UNKNOWN_KEY")
+
+        # Reject NaN / Inf numeric parameters
+        with self.assertRaises(p.DivePlannerValidationError) as ctx_nan:
+            cfg = p.DiveConfig(gf_low=float("nan"), gf_high=85.0)
+            cfg.validate()
+        self.assertEqual(ctx_nan.exception.code, "ERR_GF_RANGE")
+
+        with self.assertRaises(p.DivePlannerValidationError) as ctx_inf:
+            p.surface_pressure_bar(float("inf"))
+        self.assertEqual(ctx_inf.exception.code, "ERR_ELEVATION")
+
+        # Reject out-of-range CCR setpoints
+        with self.assertRaises(p.DivePlannerValidationError) as ctx_sp:
+            cfg = p.DiveConfig(ccr_setpoint_bottom=2.10)
+            cfg.validate()
+        self.assertEqual(ctx_sp.exception.code, "ERR_SETPOINT")
+
+        # Reject invalid ascent_rate in solve_rock_bottom (prevents division by zero)
+        with self.assertRaises(p.DivePlannerValidationError) as ctx_rb:
+            p.solve_rock_bottom(depth=180.0, bottom_time_min=25.0, ascent_rate=0.0)
+        self.assertEqual(ctx_rb.exception.code, "ERR_KINEMATIC_RATE")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,61 @@
+# Security, Sanitization, Privacy, and Accessibility Audit Report
+
+## 1. Repository Scope and Architecture Summary
+
+- **Repository**: `tech-dive-skills` (`tech-dive-planner`)
+- **Runtime Components**:
+  - Deterministic Python 3.10+ Standard Library CLI and decompression engine (`scripts/zhl16c_planner.py`) implementing Bühlmann ZH-L16C (`1b` and `1`), Haldane and Schreiner gas transport equations, Erik C. Baker Gradient Factors, NOAA CNS %, Lambertsen/Baker OTU, and Real-Gas Virial Z-factor blending.
+  - Standalone offline HTML5 dashboard generator (`scripts/build_dashboard.py`) emitting `dashboard.html`.
+  - Automated unit, smoke, and end-to-end test suite (`tests/run_tests.py`, `tests/test_unit_zhl16c.py`, `tests/test_smoke.py`, `tests/test_system_e2e.py`).
+- **Persistence and Network Posture**:
+  - No database server, SQL/NoSQL store, HTTP backend, authentication layer, password store, session cookies, webhooks, API tokens, or remote telemetry endpoints.
+  - Client-side persistence is limited to optional browser `localStorage` keys (`zhl16c-custom-profiles`, `theme-preference`) with JSON export (`Export`), validated JSON import (`Import`), per-profile deletion (`Delete`), and single-action erasure (`Clear Local Data`).
+  - Zero external font, CDN, embed, avatar, or script network calls, enforced via an offline Content-Security-Policy meta directive (`default-src 'none'; connect-src 'none'`).
+- **License**: Apache License, Version 2.0 (`LICENSE`).
+
+---
+
+## 2. Findings Register (Final Statuses)
+
+| ID | Category | Severity | File:Line | Issue Description | Applied Remediation | Breaking Interface? | Status |
+|---|---|---|---|---|---|---|---|
+| S-001 | XSS / DOM Injection | High | `scripts/build_dashboard.py:1950-2690` | User-editable and JSON-imported strings (`gas.name`, `role`, `cylinder_preset`, `warnings`) were interpolated into `innerHTML` without HTML escaping. | Added `escapeHtml()` helper in embedded JavaScript and applied HTML escaping to all dynamic interpolations across gas inventory, hover tooltip, warning banners, decompression schedule, cylinder logistics, tissue matrix, and utility result tables. | No | Fixed |
+| S-002 | Script Breakout XSS | High | `scripts/build_dashboard.py:59-66` | Raw `json.dumps()` output injected into an inline `<script>` tag allowed `</script>` or `<!--` in saved profile metadata to break out of the script element. | Unicode-escaped `&`, `<`, `>`, `\u2028`, and `\u2029` in `embedded_json` prior to template substitution; added regression test in `tests/test_system_e2e.py`. | No | Fixed |
+| S-003 | Network Security / CSP | Medium | `scripts/build_dashboard.py:72-73` | `dashboard.html` lacked an explicit Content-Security-Policy directive and `referrer` policy enforcing offline browser isolation. | Added `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; font-src 'self' data:; img-src 'none'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none';" />` and `<meta name="referrer" content="no-referrer" />`. | No | Fixed |
+| S-004 | Input Validation | Medium | `scripts/zhl16c_planner.py:137-150`, `scripts/zhl16c_planner.py:984-1065`, `scripts/zhl16c_planner.py:2362-2465`, `assets/dive_plan_schema.json:131-194` | `config_from_dict()` ignored undefined keys and raised unhandled `TypeError` on malformed gas dicts; `DiveConfig.validate()` omitted finite-number (`NaN`/`Inf`) checks, CCR setpoint `[0.40, 1.60]` bounds, unit enum validation, and gas mix validation; `solve_rock_bottom()` allowed zero `ascent_rate`; JSON store readers did not catch `JSONDecodeError`. | Added `_require_finite()`, full enum/setpoint/gas validation in `DiveConfig.validate()` and solver functions, strict undefined-key rejection (`ERR_UNKNOWN_KEY`) in `config_from_dict()`, `"additionalProperties": false` in `assets/dive_plan_schema.json`, and structured `ERR_MALFORMED_JSON` (exit code `3`) handling in `_read_json_file()`. | No | Fixed |
+| S-005 | Client Import Hardening | Medium | `scripts/build_dashboard.py:2918-3030` | `importProfilesJson()` lacked a file-size cap, prototype-pollution key filtering, and schema validation before persisting imported JSON to `localStorage`. | Added 1 MB import file cap (`MAX_IMPORT_BYTES`), `stripUnsafeKeys()` filtering (`__proto__`, `constructor`, `prototype`), and `sanitizeImportedConfig()` / `sanitizeImportedGas()` bounds validation. | No | Fixed |
+| S-006 | Error Handling / Logging | Low | `scripts/zhl16c_planner.py:2492-2499`, `scripts/zhl16c_planner.py:2918-2923` | `_rebuild_dashboard_if_present()` suppressed rebuild exceptions without logging; CLI input-file errors printed raw paths. | Logged rebuild exceptions with `LOGGER.warning(...)` and formatted in-repository error paths via `_to_relative_path_str()`. | No | Fixed |
+| C-001 | Sanitization / Hygiene | Medium | `.gitignore:1-74` | `.gitignore` contained unrelated agent-framework references and unrelated bioinformatics file patterns. | Removed all unrelated framework and bioinformatics patterns while keeping Python, virtual environment, secret, OS/editor, log, and coverage ignore rules. | No | Fixed |
+| C-002 | Sanitization / Docs | Medium | `DESIGN.md:1-97` | `DESIGN.md` contained unrelated template references to 3D molecular views, WebGL, structural bonds, node maps, and HTTP Server-Sent Events (SSE). | Rewrote `DESIGN.md` to document the standalone technical dive planner dashboard architecture, text-labeled theme switcher, WCAG 2.2 AA contrast tokens, and verification checklist. | No | Fixed |
+| C-003 | Documentation Drift | Low | `SKILL.md:80`, `README.md:17-133`, `PRD.md:112-345`, `documents/prd.md:112-345` | `SKILL.md:80` referenced non-existent profile ID `syn-ccr-bailout-240ft`; `README.md`, `PRD.md`, and `documents/prd.md` listed outdated dashboard tab/card labels and directory trees. | Updated `SKILL.md:80` to `SYNTH-CCR-BAILOUT-250FT`; synchronized `README.md`, `PRD.md`, and `documents/prd.md` directory trees, dashboard UI documentation, non-functional requirements, and error handling matrix. | No | Fixed |
+| A-001 | WCAG 2.2 AA Contrast | Medium | `scripts/build_dashboard.py:76-135`, `scripts/build_dashboard.py:2135-2258` | Multiple foreground/control pairs in Light and Dark modes fell below WCAG 2.2 AA minimums (4.5:1 text, 3.0:1 UI control borders). | Retained surface and chart palette tokens while adding WCAG 2.2 AA foreground, button, badge, and control-border CSS custom properties (`>= 5.0:1` text contrast and `>= 3.6:1` UI border contrast across Light and Dark modes); verified programmatically in `tests/test_system_e2e.py`. | No | Fixed |
+| A-002 | WCAG Keyboard / Focus | Medium | `scripts/build_dashboard.py:137-180`, `scripts/build_dashboard.py:840-850`, `scripts/build_dashboard.py:1100-1190`, `scripts/build_dashboard.py:2160-2315` | `outline: none` removed input focus rings; buttons lacked `:focus-visible` styles; schedule and utility tab bars lacked ARIA tablist roles and arrow-key navigation; skip link was absent; chart tooltip was mouse-only. | Added `:focus-visible` focus rings, a skip-to-main-content link, WAI-ARIA `tablist`/`tab`/`tabpanel` attributes with `handleTablistKeydown()`, and keyboard chart scrubbing (`handleChartKeydown()`). | No | Fixed |
+| A-003 | WCAG Semantics / Labels | Medium | `scripts/build_dashboard.py:809`, `scripts/build_dashboard.py:898-905`, `scripts/build_dashboard.py:1274-1284`, `scripts/build_dashboard.py:1311-1314`, `scripts/build_dashboard.py:1956-1975` | Missing `<footer>` landmark; unlabeled static and dynamic form controls; empty action `<th>`; missing `scope="col"` on table headers. | Added semantic `<footer class="site-footer">`, explicit `aria-label` attributes on all static and dynamic inputs/buttons, `scope="col"` on all `<th>` elements, and an `Action` column header. | No | Fixed |
+| A-004 | Visual Cues & Theme Controls | Medium | `scripts/build_dashboard.py:825-827`, `scripts/build_dashboard.py:2293-2375` | 16-compartment tissue loading bars conveyed state by color alone without text status tags or `role="progressbar"`; theme switcher buttons used textless SVG icons. | Added `role="progressbar"` ARIA attributes and bracketed text state tags (`[OK]`, `[CAUTION]`, `[OVER GF]`) to compartment bars; formatted status badges with explicit bracketed tags; replaced the three theme switcher SVG icons with text labels (`Light`, `Dark`, `System`) preserving all button IDs, titles, and ARIA attributes. | No | Fixed |
+| P-001 | Local Data Erasure | Low | `scripts/build_dashboard.py:808`, `scripts/build_dashboard.py:2774-2787` | Browser `localStorage` supported JSON export and single-profile deletion, but had no single-action erasure control for all locally stored data. | Added `Clear Local Data` (`#btn-clear-local-data` / `clearAllLocalData()`) removing `zhl16c-custom-profiles` and `theme-preference` from `localStorage`. | No | Fixed |
+| L-001 | Legal Templates | Low | `legal/privacy.md`, `legal/terms.md`, `legal/refunds.md`, `legal/cookies.md` | Draft legal policy templates were absent. | Added four OSS-scoped draft templates in `legal/` attributed to `tech-dive-skills` Open-Source Contributors, marked `DRAFT — REQUIRES LEGAL REVIEW`, covering offline local-only storage, Apache 2.0 licensing, zero fees/cookies/processors, and technical diving risk disclaimers. | No | Human-Action-Required (OSS Drafts Created) |
+
+---
+
+## 3. Verification Gate Results
+
+| Gate | Validation Target | Outcome | Evidence |
+|---|---|---|---|
+| Gate 1 | Test Suite Integrity | Pass | Pre-remediation baseline: 16/16 passing (`python3 tests/run_tests.py`). Post-remediation: 19/19 passing with zero regressions. |
+| Gate 2 | Interface Contract | Pass | All 11 CLI subcommands, exit codes (`0`, `2`, `3`), JSON schemas, `SKILL.md` operational workflow, and `dashboard.html` IDs/functions verified preserved. |
+| Gate 3 | Secret Scanning | Pass | Regex scan across all active repository files and `git log -p --all` returned zero credentials, API keys, or private keys. |
+| Gate 4 | Authorization Testing | Not Applicable | No backend server, user database, or authenticated routes exist; strict engine input validation and client JSON import sanitization verified by unit and E2E tests. |
+| Gate 5 | Network Isolation | Pass | `dashboard.html` enforces `Content-Security-Policy: default-src 'none'; connect-src 'none'`; zero external HTTP/HTTPS URLs, `fetch`, `XMLHttpRequest`, or `WebSocket` calls exist in runtime code or HTML. |
+| Gate 6 | Font Isolation | Pass | Verified zero external font links or requests; typography uses local/system font stacks and `font-src 'self' data:`. |
+| Gate 7 | Repository Sanitization | Pass | Full repository scan confirmed zero prohibited personal usernames, internal tool names, or corporate identifiers. |
+| Gate 8 | Path Relativization | Pass | Verified zero local machine absolute paths across all repository files; automated check enforced in `tests/test_system_e2e.py`. |
+| Gate 9 | Documentation & PRD | Pass | `README.md`, `PRD.md`, `documents/prd.md`, `DESIGN.md`, and `SKILL.md` updated and verified accurate with all algorithm and license names preserved. |
+| Gate 10 | Text & Visual Purity | Pass | Verified zero Unicode emojis, zero decorative UI icons, and zero unintended boilerplate text across the entire repository. |
+| Gate 11 | Audit Log Finalization | Pass | Every finding in Section 2 carries a definitive status (`Fixed` or `Human-Action-Required`). |
+
+---
+
+## 4. Human-Action-Required Items
+
+1. **Legal Counsel Review (`L-001`)**: For standard free open-source distribution under Apache License 2.0, optionally have legal counsel review the technical diving safety disclaimer and OSS notices in `legal/terms.md`, `legal/privacy.md`, `legal/cookies.md`, and `legal/refunds.md`. Full legal entity, jurisdiction, DPA/transfer, and refund customization is only required if a downstream operator hosts the dashboard online or offers a paid/commercial service.
+2. **Git History**: Full history scan (`git log -p --all`) confirmed zero committed secrets or prohibited personal identifiers; no git history rewrite is needed.
