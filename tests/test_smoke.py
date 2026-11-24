@@ -142,6 +142,112 @@ class TestCliSmoke(unittest.TestCase):
             del_out = json.loads(proc_del.stdout)
             self.assertEqual(del_out["total_profiles"], 0)
 
+    def test_cylinders_save_list_delete_lifecycle(self) -> None:
+        # 1. Verify top-level --help lists cylinders cleanly and has no raw argparse dict bug
+        proc_help = self._run_cli(["--help"])
+        self.assertEqual(proc_help.returncode, 0, msg=proc_help.stderr)
+        self.assertIn("cylinders", proc_help.stdout)
+        self.assertNotIn("option_strings", proc_help.stdout)
+
+        proc_cyl_help = self._run_cli(["cylinders", "--help"])
+        self.assertEqual(proc_cyl_help.returncode, 0, msg=proc_cyl_help.stderr)
+        self.assertIn("--cylinder-id", proc_cyl_help.stdout)
+        self.assertIn("--rated-cuft", proc_cyl_help.stdout)
+        self.assertIn("--water-liters", proc_cyl_help.stdout)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            temp_store = str(Path(tmpdir) / "custom_cyl_store.json")
+
+            # 2. Save custom Imperial cylinder (HP130)
+            proc_imp = self._run_cli([
+                "cylinders", "--action", "save",
+                "--cylinder-id", "HP130",
+                "--name", "High Pressure Steel 130",
+                "--rated-cuft", "130",
+                "--rated-psi", "3442",
+                "--profiles-file", temp_store,
+            ])
+            self.assertEqual(proc_imp.returncode, 0, msg=proc_imp.stderr)
+            imp_out = json.loads(proc_imp.stdout)
+            self.assertEqual(imp_out["action"], "created")
+            self.assertEqual(imp_out["cylinder_id"], "HP130")
+            self.assertAlmostEqual(imp_out["spec"]["rated_bar"], 237.3, delta=0.2)
+            self.assertGreater(imp_out["spec"]["water_liters"], 15.0)
+
+            # 3. Save custom Metric cylinder (D15_232)
+            proc_met = self._run_cli([
+                "cylinders", "--action", "save",
+                "--cylinder-id", "D15_232",
+                "--name", "Twin 2x15L Euro Doubles",
+                "--water-liters", "30.0",
+                "--rated-bar", "232",
+                "--profiles-file", temp_store,
+            ])
+            self.assertEqual(proc_met.returncode, 0, msg=proc_met.stderr)
+            met_out = json.loads(proc_met.stdout)
+            self.assertEqual(met_out["custom_count"], 2)
+            self.assertAlmostEqual(met_out["spec"]["rated_psi"], 3364.9, delta=0.5)
+
+            # 4. List cylinders includes 14 built-ins + 2 custom
+            proc_list = self._run_cli(["cylinders", "--action", "list", "--profiles-file", temp_store])
+            self.assertEqual(proc_list.returncode, 0, msg=proc_list.stderr)
+            list_out = json.loads(proc_list.stdout)
+            self.assertEqual(list_out["builtin_count"], 14)
+            self.assertEqual(list_out["custom_count"], 2)
+            ids = {c["cylinder_id"] for c in list_out["cylinders"]}
+            self.assertIn("HP130", ids)
+            self.assertIn("D15_232", ids)
+
+            # 5. Use custom cylinders across plan, rock-bottom, and blend CLI subcommands
+            proc_plan = self._run_cli([
+                "--json", "plan", "--depth", "150", "--time", "20", "--f-o2", "0.21", "--f-he", "0.35",
+                "--cylinder", "HP130", "--profiles-file", temp_store,
+            ])
+            self.assertEqual(proc_plan.returncode, 0, msg=proc_plan.stderr)
+            plan_out = json.loads(proc_plan.stdout)
+            self.assertEqual(plan_out["primary_plan"]["cylinder_logistics"][0]["cylinder_preset"], "HP130")
+            self.assertEqual(plan_out["primary_plan"]["cylinder_logistics"][0]["start_pressure_psi"], 3442.0)
+
+            proc_rb = self._run_cli([
+                "rock-bottom", "--depth", "150", "--time", "20",
+                "--cylinder", "HP130", "--fill-psi", "3442",
+                "--profiles-file", temp_store,
+            ])
+            self.assertEqual(proc_rb.returncode, 0, msg=proc_rb.stderr)
+            rb_out = json.loads(proc_rb.stdout)
+            self.assertEqual(rb_out["cylinder_preset"], "HP130")
+
+            proc_bl = self._run_cli([
+                "blend", "--cylinder", "D15_232", "--pressure-units", "bar",
+                "--target-pressure", "232", "--target-f-o2", "0.18", "--target-f-he", "0.45",
+                "--profiles-file", temp_store,
+            ])
+            self.assertEqual(proc_bl.returncode, 0, msg=proc_bl.stderr)
+            bl_out = json.loads(proc_bl.stdout)
+            self.assertEqual(bl_out["cylinder_capacity"]["cylinder_preset"], "D15_232")
+            self.assertEqual(bl_out["cylinder_capacity"]["water_volume_liters"], 30.0)
+
+            # 6. Built-in protection & unknown cylinder rejection -> exit code 2
+            proc_builtin = self._run_cli([
+                "cylinders", "--action", "delete", "--cylinder-id", "AL80", "--profiles-file", temp_store,
+            ])
+            self.assertEqual(proc_builtin.returncode, 2)
+            self.assertIn("ERR_CYLINDER_BUILTIN", proc_builtin.stderr)
+
+            proc_unknown = self._run_cli([
+                "rock-bottom", "--depth", "130", "--cylinder", "NON_EXISTENT_999", "--profiles-file", temp_store,
+            ])
+            self.assertEqual(proc_unknown.returncode, 2)
+            self.assertIn("ERR_CYLINDER_ID", proc_unknown.stderr)
+
+            # 7. Delete custom cylinder cleanly
+            proc_del = self._run_cli([
+                "cylinders", "--action", "delete", "--cylinder-id", "HP130", "--profiles-file", temp_store,
+            ])
+            self.assertEqual(proc_del.returncode, 0, msg=proc_del.stderr)
+            del_out = json.loads(proc_del.stdout)
+            self.assertEqual(del_out["custom_count"], 1)
+
     def test_error_exit_codes(self) -> None:
         # Invalid GF Low > GF High -> exit code 2
         proc_val = self._run_cli(["plan", "--depth", "150", "--time", "20", "--gf-low", "90", "--gf-high", "50"])

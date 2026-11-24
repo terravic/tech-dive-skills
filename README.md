@@ -120,6 +120,12 @@ When this skill is loaded in your agent workspace, state your dive parameters or
 - **What happens**:
   The assistant runs the dive plan, saves your custom configuration into `assets/synthetic_dive_profiles.json`, and updates `dashboard.html` so that **"Wreck 165ft - 30 min"** appears immediately in the **Profile** dropdown menu whenever you open the dashboard.
 
+#### Example 6: Adding a Custom Cylinder Type for Both Dive Planner and Diver Tools
+- **What you can ask**:
+  > "Add a custom cylinder type `HP130` named 'High Pressure Steel 130' rated at 130 cuft @ 3442 psi so I can select it in both Dive Planner and Diver Tools."
+- **What happens**:
+  The assistant runs `cylinders --action save`, auto-derives the Metric equivalent (`15.72 L` water volume @ `237.3 bar`), saves `HP130` under `custom_cylinders` in `assets/synthetic_dive_profiles.json`, and automatically rebuilds `dashboard.html` so `HP130` appears immediately in **Dive Planner -> Gas Mixes** and all **Diver Tools** cylinder selectors.
+
 ---
 
 ### 3.2 Using the Interactive Web Dashboard (`dashboard.html`)
@@ -127,12 +133,12 @@ When this skill is loaded in your agent workspace, state your dive parameters or
 Open `dashboard.html` in any web browser (double-click the file in your file manager). No internet connection or local server is needed. The main page is organized into two primary workspace tabs at the top of the screen:
 
 1. **Main Tab 1 (`Dive Planner`)**:
-   - **Open, Create, or Manage a Profile**: Select an existing dive profile from the top **Profile** dropdown menu, click **`New`** to initialize a fresh dive profile, **`Save`** to persist the current profile in browser `localStorage`, **`Delete`** to remove a saved profile, **`Export`** / **`Import`** to back up or load JSON profile files (exports include `safety_notice` metadata), **`Print Plan`** to print or save a PDF dive plan with the full mandatory verification notice and pre-dive verification checklist, or **`Clear Local Data`** to erase all locally stored profiles and theme preferences.
+   - **Open, Create, or Manage a Profile**: Select an existing dive profile from the top **Profile** dropdown menu, click **`New`** to initialize a fresh dive profile, **`Save`** to persist the current profile in browser `localStorage`, **`Delete`** to remove a saved profile, **`Export`** / **`Import`** to back up or load JSON files containing both saved profiles and custom cylinder types (exports include `safety_notice` metadata), **`Print Plan`** to print or save a PDF dive plan with the full mandatory verification notice and pre-dive verification checklist, or **`Clear Local Data`** to erase all locally stored profiles, custom cylinders, and theme preferences.
    - **Choose Circuit Mode, Units, and Theme**: Directly beneath the **Profile** selector, use the dedicated settings row to switch between **`OC`** and **`CCR`**, toggle **`FT / CUFT`** vs. **`M / LITERS`**, and select **Light** (sun), **Dark** (moon), or **System** (monitor) theme icons.
-   - **Configure Dive Parameters**: Enter target depth and bottom time in **Dive Profile** (or click **`Auto Best Gas`**), edit cylinders and mixes in **Gas Mixes**, adjust **`GF Low`** / **`GF High`** and Compartment `1b`/`1` in **Gradient Factors & Algorithm**, and tune stops, ascent/descent rates, RMV, and altitude in **Stops, Rates & RMV**.
+   - **Configure Dive Parameters**: Enter target depth and bottom time in **Dive Profile** (or click **`Auto Best Gas`**), edit cylinders and mixes in **Gas Mixes** (or click **`+ Cylinder`** to add or delete custom cylinder types), adjust **`GF Low`** / **`GF High`** and Compartment `1b`/`1` in **Gradient Factors & Algorithm**, and tune stops, ascent/descent rates, RMV, and altitude in **Stops, Rates & RMV**.
    - **Review Ascent & Telemetry**: Inspect the 4 KPI summary cards, the interactive **Depth & Decompression Ceiling** SVG chart (hover with mouse or focus and use `Left`/`Right` arrow keys), and the **Decompression Schedule**, **Cylinder Gas**, and **Tissue Compartments** tabs.
 2. **Main Tab 2 (`Diver Tools`)**:
-   - Switches to a dedicated full-width calculators screen with five sub-tabs:
+   - Switches to a dedicated full-width calculators screen with five sub-tabs and a top-right **`Manage Cylinders`** button (opening the same custom cylinder manager as **`+ Cylinder`** in Dive Planner; any custom cylinder you add appears immediately across **Dive Planner -> Gas Mixes** and all three cylinder-aware Diver Tools below):
      - **`EAD / END / MOD & Gas Density`**: Calculates Maximum Operating Depth (`MOD`), Minimum Operating Depth (`MinOD`), Equivalent Air Depth (`EAD`), Equivalent Narcotic Depth (`END`), Maximum Narcotic Depth (`MND`), Breathing Gas Density at depth ($\text{g/L}$ with `5.2` / `6.2 g/L` thresholds and `MDD`), and maximum depth supported by your selected cylinder.
      - **`Best Mix`**: Calculates optimal Nitrox or Trimix fractions for any target depth, $P_{\text{O}_2}$, and `END` limit, with a **`Trimix (Allow He)`** / **`Nitrox / Air Only (No He)`** mode toggle and physiological alerts when omitting helium exceeds END, density, or Air `MOD` limits.
      - **`Gas Blender`**: Calculates step-by-step partial-pressure gas blending (`Helium`, `Oxygen`, and `Air` top-up) and bleed-down pressures over partially full cylinders.
@@ -218,6 +224,39 @@ python3 scripts/zhl16c_planner.py profiles --action delete --profile-id custom-2
 # Regenerate the standalone HTML dashboard
 python3 scripts/build_dashboard.py
 ```
+
+### 4.4 Adding & Managing Custom Cylinder Types (`cylinders`)
+
+To add a custom **Cylinder Type** so it appears automatically across CLI commands, **Dive Planner -> Gas Mixes**, and all **Diver Tools** cylinder selectors (`EAD / END / MOD & Gas Density`, `Gas Blender`, and `Rock Bottom & Reserves`):
+
+- **Option A — Via CLI (Persists to `assets/synthetic_dive_profiles.json` and Rebuilds `dashboard.html`)**:
+  Supply either **Imperial** specs (`--rated-cuft` + `--rated-psi`) or **Metric** specs (`--water-liters` + `--rated-bar`); the counterpart units are derived automatically for consistent 1:1 deliverable gas volume (or you can specify all four flags explicitly):
+
+  ```bash
+  # List all 14 built-in standard cylinders plus any custom cylinders
+  python3 scripts/zhl16c_planner.py cylinders --action list
+
+  # Add a custom cylinder using Imperial specs (Metric water_liters and rated_bar auto-derived)
+  python3 scripts/zhl16c_planner.py cylinders --action save \
+    --cylinder-id HP130 --name "High Pressure Steel 130" \
+    --rated-cuft 130 --rated-psi 3442
+
+  # Add a custom cylinder using Metric specs (Imperial rated_cuft and rated_psi auto-derived)
+  python3 scripts/zhl16c_planner.py cylinders --action save \
+    --cylinder-id D15_232 --name "Twin 2x15L Euro Doubles" \
+    --water-liters 30.0 --rated-bar 232
+
+  # Use your custom cylinder immediately in any CLI command
+  python3 scripts/zhl16c_planner.py plan --depth 180 --time 25 --f-o2 0.18 --f-he 0.45 --cylinder HP130
+  python3 scripts/zhl16c_planner.py rock-bottom --depth 180 --time 25 --cylinder HP130 --fill-psi 3442
+  python3 scripts/zhl16c_planner.py blend --cylinder D15_232 --pressure-units bar --target-pressure 232 --target-f-o2 0.18 --target-f-he 0.45
+
+  # Delete a custom cylinder (built-in standard cylinders are protected) and rebuild dashboard.html
+  python3 scripts/zhl16c_planner.py cylinders --action delete --cylinder-id HP130
+  ```
+
+- **Option B — Directly in the Browser Dashboard (`dashboard.html`)**:
+  Click **`+ Cylinder`** inside **Dive Planner -> Gas Mixes** or **`Manage Cylinders`** inside **Diver Tools**. Enter a unique ID (`1-32` characters, e.g., `HP130`), display name, and either **Imperial (`cuft / psi`)** or **Metric (`L / bar`)** specs, then click **`Save Cylinder`**. Browser-added cylinders update every Dive Planner and Diver Tools dropdown immediately, persist in browser `localStorage` (`zhl16c-custom-cylinders`), round-trip through **`Export`** / **`Import`** JSON backups, and are removed by **`Clear Local Data`**.
 
 ---
 

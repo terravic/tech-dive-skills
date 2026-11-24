@@ -22,7 +22,7 @@ This document defines the visual, structural, accessibility, and technical speci
 * **Self-Contained Offline Execution:** `dashboard.html` runs directly from local disk (`file://`) or any static webview using standard HTML5, CSS custom properties, SVG, and vanilla JavaScript with zero external network requests.
 * **Content Security Policy:** The document head enforces a strict offline `<meta http-equiv="Content-Security-Policy">` (`default-src 'none'; connect-src 'none'; img-src 'none'; font-src 'self' data:`) and `<meta name="referrer" content="no-referrer" />`.
 * **Dynamic State Updates:** Client-side recalculation via the embedded Bühlmann ZH-L16C + Gradient Factors solver updates KPI cards, the dual Y-axis SVG profile chart, tables, and utility calculators without resetting scroll position or active tab selection.
-* **Local Persistence and Data Controls:** Custom profiles (`zhl16c-custom-profiles`) and theme mode (`theme-preference`) persist exclusively in browser `localStorage`, with JSON `Export`, validated JSON `Import`, per-profile `Delete`, and single-action `Clear Local Data`.
+* **Local Persistence and Data Controls:** Custom profiles (`zhl16c-custom-profiles`), custom cylinder types (`zhl16c-custom-cylinders`), and theme mode (`theme-preference`) persist exclusively in browser `localStorage`, with JSON `Export`, validated JSON `Import`, per-item `Delete`, and single-action `Clear Local Data`.
 
 ---
 
@@ -61,7 +61,7 @@ The dashboard natively supports Light Mode, Dark Mode, and System Mode tracking 
 ## 4. Dashboard Layout, Accessibility, and Component Rules
 
 * **Semantic Landmarks and Heading Hierarchy:** Enforce `<header>`, `<nav>`, `<main id="main-content">`, and `<footer class="site-footer">` with a single `<h1>` title and logical `<h2>` card headings.
-* **Keyboard Navigation and Focus Management:** Provide a `Skip to main content` link, high-contrast `:focus-visible` outlines on all interactive controls, WAI-ARIA `tablist`/`tab`/`tabpanel` arrow-key navigation across workspace/schedule/utility tabs, and keyboard scrubbing (`ArrowLeft`, `ArrowRight`, `Home`, `End`, `Escape`) on the dive profile SVG chart.
+* **Keyboard Navigation and Focus Management:** Provide a `Skip to main content` link, high-contrast `:focus-visible` outlines on all interactive controls, WAI-ARIA `tablist`/`tab`/`tabpanel` arrow-key navigation across workspace/schedule/utility tabs, keyboard scrubbing (`ArrowLeft`, `ArrowRight`, `Home`, `End`, `Escape`) on the dive profile SVG chart, and an accessible `role="dialog"` / `aria-modal="true"` **Manage Custom Cylinder Types** modal (`#cylinder-manager-modal`) supporting `Escape` dismissal and trigger focus restoration.
 * **Tables:** Render decompression stops, cylinder gas logistics, 16-compartment tissue tensions, and utility outputs in monospaced tabular numerals (`IBM Plex Mono`, `tabular-nums`) with `<th scope="col">` column headers.
 * **Dual Y-Axis Dive Profile Chart:** Plot actual depth, Gradient Factor decompression ceiling, decompression stop markers, and inspired `PO2 (ATA)` deterministically in inline SVG with mouse hover and keyboard crosshair telemetry inspection (`#chart-hover-tooltip`).
 

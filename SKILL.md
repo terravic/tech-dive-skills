@@ -105,6 +105,26 @@ python3 scripts/zhl16c_planner.py profiles \
   --action delete --profile-id custom-trimix-200ft
 ```
 
+### 3.1c Cylinder Library Management Subcommand (`cylinders`)
+```bash
+# List all built-in and custom cylinder types
+python3 scripts/zhl16c_planner.py cylinders --action list
+
+# Add a custom cylinder (Imperial: Metric water_liters and rated_bar auto-derived)
+python3 scripts/zhl16c_planner.py cylinders \
+  --action save --cylinder-id HP130 --name "High Pressure Steel 130" \
+  --rated-cuft 130 --rated-psi 3442
+
+# Add a custom cylinder (Metric: Imperial rated_cuft and rated_psi auto-derived)
+python3 scripts/zhl16c_planner.py cylinders \
+  --action save --cylinder-id D15_232 --name "Twin 2x15L Euro Doubles" \
+  --water-liters 30.0 --rated-bar 232
+
+# Delete a custom cylinder (built-in STANDARD_CYLINDERS are protected) and rebuild dashboard.html
+python3 scripts/zhl16c_planner.py cylinders \
+  --action delete --cylinder-id HP130
+```
+
 ### 3.2 Variant 2: Tank & Gas Mix -> Maximum Safe Operating Depth (`max-depth`)
 ```bash
 python3 scripts/zhl16c_planner.py max-depth \

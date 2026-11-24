@@ -50,6 +50,7 @@ def load_precomputed_benchmarks() -> Dict[str, Any]:
     return {
         "profiles": computed_profiles,
         "standard_cylinders": planner.STANDARD_CYLINDERS,
+        "custom_cylinders": planner.load_custom_cylinders(profiles_path),
         "standard_agency_mixes": planner.STANDARD_AGENCY_MIXES,
     }
 
@@ -869,6 +870,90 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       gap: 10px;
     }
 
+    .section-header-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .tools-tabbar-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 10px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .tools-tabbar-row .tab-bar {
+      border-bottom: none;
+      padding-bottom: 0;
+      margin-bottom: 0;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      background: rgba(13, 14, 17, 0.62);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .modal-backdrop[hidden] {
+      display: none !important;
+    }
+
+    .modal-dialog {
+      width: 100%;
+      max-width: 720px;
+      max-height: 90vh;
+      overflow-y: auto;
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-control);
+      border-radius: 8px;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 10px;
+    }
+
+    .modal-preview-box {
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-subtle);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+    }
+
+    .modal-cli-hint {
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-subtle);
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      color: var(--text-secondary);
+      word-break: break-word;
+    }
+
     .print-safety-block {
       display: none;
     }
@@ -890,6 +975,8 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       .navbar-controls,
       .workspace-tabs,
       .tab-bar,
+      .tools-tabbar-row,
+      .modal-backdrop,
       .chart-hover-tooltip,
       button,
       input[type="file"] {
@@ -1078,7 +1165,10 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
         <div class="card">
           <div class="section-header">
             <h2 class="section-title">Gas Mixes</h2>
-            <button type="button" class="btn btn-sm" onclick="addDefaultGasRow()">+ Add Mix</button>
+            <div class="section-header-actions">
+              <button type="button" id="btn-manage-cylinders-planner" class="btn btn-sm" title="Add or manage custom cylinder types" onclick="openCylinderManagerModal(this)">+ Cylinder</button>
+              <button type="button" class="btn btn-sm" onclick="addDefaultGasRow()">+ Add Mix</button>
+            </div>
           </div>
 
           <div class="table-wrap">
@@ -1380,12 +1470,15 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
 
         <!-- Card R3: Diver Tools -->
         <div class="card">
-          <div class="tab-bar" role="tablist" aria-label="Diver Utility Calculators" onkeydown="handleTablistKeydown(event)">
-            <button type="button" id="util-tab-btn-mod" class="tab-btn active" role="tab" aria-selected="true" aria-controls="util-tab-mod" tabindex="0" onclick="switchUtilityTab('util-tab-mod', this)">EAD / END / MOD &amp; Gas Density</button>
-            <button type="button" id="util-tab-btn-bestmix" class="tab-btn" role="tab" aria-selected="false" aria-controls="util-tab-bestmix" tabindex="-1" onclick="switchUtilityTab('util-tab-bestmix', this)">Best Mix</button>
-            <button type="button" id="util-tab-btn-blender" class="tab-btn" role="tab" aria-selected="false" aria-controls="util-tab-blender" tabindex="-1" onclick="switchUtilityTab('util-tab-blender', this)">Gas Blender</button>
-            <button type="button" id="util-tab-btn-density" class="tab-btn" role="tab" aria-selected="false" aria-controls="util-tab-density" tabindex="-1" onclick="switchUtilityTab('util-tab-density', this)">Rock Bottom &amp; Reserves</button>
-            <button type="button" id="util-tab-btn-si" class="tab-btn" role="tab" aria-selected="false" aria-controls="util-tab-surface-interval" tabindex="-1" onclick="switchUtilityTab('util-tab-surface-interval', this)">Repetitive / Surface Interval</button>
+          <div class="tools-tabbar-row">
+            <div class="tab-bar" role="tablist" aria-label="Diver Utility Calculators" onkeydown="handleTablistKeydown(event)">
+              <button type="button" id="util-tab-btn-mod" class="tab-btn active" role="tab" aria-selected="true" aria-controls="util-tab-mod" tabindex="0" onclick="switchUtilityTab('util-tab-mod', this)">EAD / END / MOD &amp; Gas Density</button>
+              <button type="button" id="util-tab-btn-bestmix" class="tab-btn" role="tab" aria-selected="false" aria-controls="util-tab-bestmix" tabindex="-1" onclick="switchUtilityTab('util-tab-bestmix', this)">Best Mix</button>
+              <button type="button" id="util-tab-btn-blender" class="tab-btn" role="tab" aria-selected="false" aria-controls="util-tab-blender" tabindex="-1" onclick="switchUtilityTab('util-tab-blender', this)">Gas Blender</button>
+              <button type="button" id="util-tab-btn-density" class="tab-btn" role="tab" aria-selected="false" aria-controls="util-tab-density" tabindex="-1" onclick="switchUtilityTab('util-tab-density', this)">Rock Bottom &amp; Reserves</button>
+              <button type="button" id="util-tab-btn-si" class="tab-btn" role="tab" aria-selected="false" aria-controls="util-tab-surface-interval" tabindex="-1" onclick="switchUtilityTab('util-tab-surface-interval', this)">Repetitive / Surface Interval</button>
+            </div>
+            <button type="button" id="btn-manage-cylinders-tools" class="btn btn-sm" title="Add or manage custom cylinder types across Dive Planner and Diver Tools" onclick="openCylinderManagerModal(this)">Manage Cylinders</button>
           </div>
 
           <!-- Utility Tab 1: EAD / END / MOD & Max Depth -->
@@ -1407,16 +1500,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
             <div class="form-grid-3">
               <div class="field-group">
                 <label for="u1-cylinder">Cylinder</label>
-                <select id="u1-cylinder" class="mono-select" onchange="runUtilityModAndMaxDepth()">
-                  <option value="AL80" selected>AL80 (77.4 cuft @ 3000 psi)</option>
-                  <option value="AL40">AL40 (40.0 cuft @ 3000 psi)</option>
-                  <option value="LP85">LP85 (85.0 cuft @ 2640 psi)</option>
-                  <option value="HP100">HP100 (100.0 cuft @ 3442 psi)</option>
-                  <option value="2xLP85">2xLP85 Doubles (170 cuft @ 2640 psi)</option>
-                  <option value="2xHP100">2xHP100 Doubles (200 cuft @ 3442 psi)</option>
-                  <option value="12L_232">12L Euro (232 bar)</option>
-                  <option value="D12_232">D12 Euro Doubles (232 bar)</option>
-                </select>
+                <select id="u1-cylinder" class="mono-select" data-default-cylinder="AL80" onchange="runUtilityModAndMaxDepth()"></select>
               </div>
               <div class="field-group">
                 <label for="u1-max-po2">Working Max PO2 (ATA)</label>
@@ -1461,13 +1545,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
             <div class="form-grid-3">
               <div class="field-group">
                 <label for="u3-cylinder">Cylinder Type</label>
-                <select id="u3-cylinder" class="mono-select" onchange="runUtilityBlender()">
-                  <option value="2xLP85" selected>2xLP85 Doubles (170 cuft @ 2640 psi)</option>
-                  <option value="AL80">AL80 (77.4 cuft @ 3000 psi)</option>
-                  <option value="AL40">AL40 Stage (40 cuft @ 3000 psi)</option>
-                  <option value="HP100">HP100 (100 cuft @ 3442 psi)</option>
-                  <option value="D12_232">D12 Euro Doubles (24L @ 232 bar)</option>
-                </select>
+                <select id="u3-cylinder" class="mono-select" data-default-cylinder="2xLP85" onchange="runUtilityBlender()"></select>
               </div>
               <div class="field-group">
                 <label for="u3-start-psi">Residual Pressure (PSI)</label>
@@ -1522,17 +1600,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
               </div>
               <div class="field-group">
                 <label for="u4-cylinder">Cylinder</label>
-                <select id="u4-cylinder" class="mono-select" onchange="onRockBottomCylinderChange()">
-                  <option value="2xLP85" selected>2xLP85 Doubles (170 cuft @ 2640 psi)</option>
-                  <option value="2xLP108">2xLP108 Doubles (216 cuft @ 2640 psi)</option>
-                  <option value="2xHP100">2xHP100 Doubles (200 cuft @ 3442 psi)</option>
-                  <option value="2xAL80">2xAL80 Doubles (154.8 cuft @ 3000 psi)</option>
-                  <option value="AL80">AL80 (77.4 cuft @ 3000 psi)</option>
-                  <option value="LP85">LP85 (85.0 cuft @ 2640 psi)</option>
-                  <option value="HP100">HP100 (100.0 cuft @ 3442 psi)</option>
-                  <option value="12L_232">12L Euro (232 bar)</option>
-                  <option value="D12_232">D12 Euro Doubles (24L @ 232 bar)</option>
-                </select>
+                <select id="u4-cylinder" class="mono-select" data-default-cylinder="2xLP85" onchange="onRockBottomCylinderChange()"></select>
               </div>
               <div class="field-group">
                 <label for="u4-fill-pressure">Starting Fill (<span class="unit-pressure-lbl">psi</span>)</label>
@@ -1613,6 +1681,90 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
     <span>Verify all outputs independently and confirm plans with a certified dive professional or instructor prior to diving.</span>
   </footer>
 
+  <!-- Accessible Custom Cylinder Type Manager Modal -->
+  <div id="cylinder-manager-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="cyl-modal-title" hidden onclick="if (event.target === this) closeCylinderManagerModal()">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2 id="cyl-modal-title" class="section-title">Manage Custom Cylinder Types</h2>
+        <button type="button" id="btn-close-cylinder-modal" class="btn btn-sm" aria-label="Close cylinder manager" onclick="closeCylinderManagerModal()">Close</button>
+      </div>
+
+      <p class="tool-helper-text">Custom cylinders saved here appear immediately in <strong>Dive Planner (Gas Mixes)</strong> and all <strong>Diver Tools</strong> cylinder selectors, persist in browser <code>localStorage</code>, and are included in <code>Export</code> / <code>Import</code> JSON backups.</p>
+
+      <div id="cyl-modal-alert" role="alert" style="display:none;"></div>
+
+      <div class="form-grid-2">
+        <div class="field-group">
+          <label for="cyl-input-id">Cylinder ID (1-32 chars)</label>
+          <input type="text" id="cyl-input-id" maxlength="32" placeholder="e.g. HP130 or D15_232" oninput="updateCylinderConversionPreview()" />
+        </div>
+        <div class="field-group">
+          <label for="cyl-input-name">Display Name</label>
+          <input type="text" id="cyl-input-name" maxlength="64" placeholder="e.g. High Pressure Steel 130" oninput="updateCylinderConversionPreview()" />
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span class="blender-pct-label">Input Spec Units:</span>
+        <div class="segmented-pill" role="group" aria-label="Custom Cylinder Spec Units">
+          <button type="button" id="cyl-unit-imperial" class="active" aria-pressed="true" onclick="setCylinderModalUnitMode('imperial')">Imperial (cuft / psi)</button>
+          <button type="button" id="cyl-unit-metric" aria-pressed="false" onclick="setCylinderModalUnitMode('metric')">Metric (L / bar)</button>
+        </div>
+      </div>
+
+      <div id="cyl-inputs-imperial" class="form-grid-2">
+        <div class="field-group">
+          <label for="cyl-input-cuft">Rated Capacity (cuft)</label>
+          <input type="number" id="cyl-input-cuft" value="130" min="1" max="1000" step="0.1" oninput="updateCylinderConversionPreview()" onchange="updateCylinderConversionPreview()" />
+        </div>
+        <div class="field-group">
+          <label for="cyl-input-psi">Working Pressure (psi)</label>
+          <input type="number" id="cyl-input-psi" value="3442" min="100" max="6000" step="10" oninput="updateCylinderConversionPreview()" onchange="updateCylinderConversionPreview()" />
+        </div>
+      </div>
+
+      <div id="cyl-inputs-metric" class="form-grid-2" style="display:none;">
+        <div class="field-group">
+          <label for="cyl-input-liters">Water Volume (L)</label>
+          <input type="number" id="cyl-input-liters" value="15.0" min="0.5" max="200" step="0.1" oninput="updateCylinderConversionPreview()" onchange="updateCylinderConversionPreview()" />
+        </div>
+        <div class="field-group">
+          <label for="cyl-input-bar">Working Pressure (bar)</label>
+          <input type="number" id="cyl-input-bar" value="232" min="10" max="420" step="1" oninput="updateCylinderConversionPreview()" onchange="updateCylinderConversionPreview()" />
+        </div>
+      </div>
+
+      <div id="cyl-conversion-preview" class="modal-preview-box" aria-live="polite"></div>
+
+      <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
+        <button type="button" id="btn-save-custom-cylinder" class="btn btn-primary" onclick="saveCustomCylinderFromModal()">Save Cylinder</button>
+      </div>
+
+      <div>
+        <h3 class="section-title" style="font-size:0.9rem;margin-bottom:8px;">Custom Cylinders</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">ID</th>
+                <th scope="col">Name</th>
+                <th scope="col">Imperial</th>
+                <th scope="col">Metric</th>
+                <th scope="col">Source</th>
+                <th scope="col">Action</th>
+              </tr>
+            </thead>
+            <tbody id="custom-cylinders-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-cli-hint">
+        CLI permanent sync: <code>python3 scripts/zhl16c_planner.py cylinders --action save --cylinder-id HP130 --name &quot;High Pressure Steel 130&quot; --rated-cuft 130 --rated-psi 3442</code>
+      </div>
+    </div>
+  </div>
+
   <!-- Embedded Empirical Benchmark Data & Complete Client-Side ZH-L16C + GF Engine -->
   <script>
     const BENCHMARK_DATA = __EMBEDDED_BENCHMARK_JSON__;
@@ -1627,6 +1779,20 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
     const RHO_O2_STP = 1.4290;
     const RHO_N2_STP = 1.2506;
     const RHO_HE_STP = 0.1786;
+    const CUFT_TO_LITERS = 28.316846592;
+    const VIRIAL_COEFFS = {
+      O2: [-6.48e-4, 4.20e-6],
+      N2: [-2.01e-4, 4.55e-6],
+      He: [4.85e-4, -1.50e-7]
+    };
+
+    function virialZFactor(pBar, fO2, fHe) {
+      const fN2 = Math.max(0.0, 1.0 - fO2 - fHe);
+      const zO2 = 1.0 + VIRIAL_COEFFS.O2[0] * pBar + VIRIAL_COEFFS.O2[1] * pBar * pBar;
+      const zN2 = 1.0 + VIRIAL_COEFFS.N2[0] * pBar + VIRIAL_COEFFS.N2[1] * pBar * pBar;
+      const zHe = 1.0 + VIRIAL_COEFFS.He[0] * pBar + VIRIAL_COEFFS.He[1] * pBar * pBar;
+      return fO2 * zO2 + fN2 * zN2 + fHe * zHe;
+    }
 
     const ZHL16C_1B = ["1b", 5.0, 1.1696, 0.5578, 1.88, 1.6189, 0.4770];
     const ZHL16C_1A = ["1", 4.0, 1.2599, 0.5050, 1.51, 1.7424, 0.4245];
@@ -2137,7 +2303,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       // 4. Cylinder Logistics
       const cylinderLogistics = enabledGases.map(g => {
         const usedVol = gasConsumption[g.name] || 0.0;
-        const spec = BENCHMARK_DATA.standard_cylinders[g.cylinder_preset] || BENCHMARK_DATA.standard_cylinders["AL80"];
+        const spec = getCylinderSpec(g.cylinder_preset, "AL80");
         const totalAvail = cfg.volumeUnits === "cuft"
           ? spec.rated_cuft * ((g.start_pressure_psi || spec.rated_psi) / spec.rated_psi)
           : spec.water_liters * (((g.start_pressure_psi || spec.rated_psi) / P0_PSI * P0_BAR) / P0_BAR);
@@ -2242,6 +2408,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
 
     function renderGasInventoryTable() {
       const tbody = document.getElementById("gas-inventory-tbody");
+      if (!tbody) return;
       tbody.innerHTML = "";
       appState.gases.forEach((g, idx) => {
         const rowNum = idx + 1;
@@ -2253,8 +2420,8 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
           <td><input type="number" aria-label="Gas mix ${rowNum} helium percent" value="${Math.round(g.f_he * 100)}" min="0" max="95" style="width:54px;padding:4px;" onchange="updateGasFraction(${idx}, 'f_he', this.value)" /></td>
           <td><input type="number" aria-label="Gas mix ${rowNum} switch depth" value="${Number(g.switch_depth) || 0}" min="0" max="400" style="width:58px;padding:4px;" onchange="updateGasField(${idx}, 'switch_depth', Number(this.value))" /></td>
           <td>
-            <select aria-label="Gas mix ${rowNum} cylinder preset" style="width:78px;padding:4px;font-size:0.75rem;" onchange="updateGasField(${idx}, 'cylinder_preset', this.value)">
-              ${Object.keys(BENCHMARK_DATA.standard_cylinders).map(k => `<option value="${escapeHtml(k)}" ${g.cylinder_preset === k ? 'selected' : ''}>${escapeHtml(k)}</option>`).join("")}
+            <select aria-label="Gas mix ${rowNum} cylinder preset" style="width:88px;padding:4px;font-size:0.75rem;" onchange="updateGasField(${idx}, 'cylinder_preset', this.value)">
+              ${buildGasTableCylinderOptionsHtml(g.cylinder_preset)}
             </select>
           </td>
           <td><input type="checkbox" aria-label="Enable gas mix ${rowNum}" ${g.enabled ? "checked" : ""} onchange="updateGasField(${idx}, 'enabled', this.checked)" /></td>
@@ -2267,6 +2434,12 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
     function updateGasField(idx, field, val) {
       if (field === "name") {
         appState.gases[idx][field] = String(val || "").slice(0, 64);
+      } else if (field === "cylinder_preset") {
+        appState.gases[idx][field] = val;
+        const spec = getCylinderSpec(val, "AL80");
+        if (spec && Number.isFinite(spec.rated_psi)) {
+          appState.gases[idx].start_pressure_psi = spec.rated_psi;
+        }
       } else {
         appState.gases[idx][field] = val;
       }
@@ -2785,7 +2958,8 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       const depth = Math.max(1, readNumericInput("u1-depth", 130));
       const o2Pct = readNumericInput("u1-fo2", 32);
       const hePct = readNumericInput("u1-fhe", 0);
-      const cylKey = document.getElementById("u1-cylinder").value;
+      const u1CylEl = document.getElementById("u1-cylinder");
+      const cylKey = (u1CylEl && u1CylEl.value) || "AL80";
       const maxPo2 = Math.max(0.2, readNumericInput("u1-max-po2", 1.40));
       const maxEnd = Math.max(10, readNumericInput("u1-max-end", 100));
       const resultsBox = document.getElementById("u1-results-box");
@@ -2799,7 +2973,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       const fHe = hePct / 100.0;
 
       const props = calcGasProps(depth, fO2, fHe, cfg.o2Narcotic, cfg.elevationFt, cfg.depthUnits, "OC", 1.2, maxPo2, maxEnd);
-      const spec = BENCHMARK_DATA.standard_cylinders[cylKey] || BENCHMARK_DATA.standard_cylinders["AL80"];
+      const spec = getCylinderSpec(cylKey, "AL80");
       const usableCuft = (cfg.volumeUnits === "cuft" ? spec.rated_cuft : spec.water_liters * spec.rated_bar) * (2.0 / 3.0);
 
       // Compute max depth where usable volume supports >= 10 min bottom time + ascent
@@ -3013,7 +3187,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       const addO2 = Math.max(0, rawAddO2);
       const addAir = Math.max(0, pTarget - pInit - addHe - addO2);
 
-      const spec = BENCHMARK_DATA.standard_cylinders[cylKey] || BENCHMARK_DATA.standard_cylinders["2xLP85"];
+      const spec = getCylinderSpec(cylKey, "2xLP85");
       const idealCuft = spec.rated_cuft * (pTarget / spec.rated_psi);
       const residualLabel = pStart > 0
         ? `${formatGasName(fO2Start, fHeStart)} @ ${pStart.toFixed(0)} psi`
@@ -3055,7 +3229,8 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       const cylEl = document.getElementById("u4-cylinder");
       const fillEl = document.getElementById("u4-fill-pressure");
       if (cylEl && fillEl) {
-        const spec = BENCHMARK_DATA.standard_cylinders[cylEl.value];
+        const allCyls = getAllCylinders();
+        const spec = allCyls[cylEl.value];
         if (spec) {
           fillEl.value = appState.depthUnits === "meters" ? Math.round(spec.rated_bar) : Math.round(spec.rated_psi);
         }
@@ -3067,7 +3242,8 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       const cfg = readCurrentConfig();
       const isMetric = cfg.depthUnits === "meters";
       const bGas = cfg.gases[0] || { cylinder_preset: "2xLP85", start_pressure_psi: 2640 };
-      const spec = BENCHMARK_DATA.standard_cylinders[bGas.cylinder_preset] || BENCHMARK_DATA.standard_cylinders["2xLP85"];
+      const allCyls = getAllCylinders();
+      const spec = getCylinderSpec(bGas.cylinder_preset, "2xLP85");
       const firstDeco = cfg.gases
         .filter(g => g.enabled && (g.role === "deco" || g.role === "bailout") && g.switch_depth !== null && g.switch_depth !== undefined && g.switch_depth < cfg.depth)
         .sort((a, b) => Number(b.switch_depth) - Number(a.switch_depth))[0];
@@ -3079,7 +3255,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       const ascEl = document.getElementById("u4-ascent-rate");
 
       if (depthEl) depthEl.value = Math.round(cfg.depth);
-      if (cylEl && Array.from(cylEl.options).some(o => o.value === bGas.cylinder_preset)) {
+      if (cylEl && (Object.prototype.hasOwnProperty.call(allCyls, bGas.cylinder_preset) || (cylEl.options && Array.from(cylEl.options).some(o => o.value === bGas.cylinder_preset)))) {
         cylEl.value = bGas.cylinder_preset;
       }
       if (fillEl) {
@@ -3103,7 +3279,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       const cylEl = document.getElementById("u4-cylinder");
       const bGas = cfg.gases[0] || { cylinder_preset: "2xLP85", start_pressure_psi: 2640 };
       const cylKey = (cylEl && cylEl.value) || bGas.cylinder_preset || "2xLP85";
-      const spec = BENCHMARK_DATA.standard_cylinders[cylKey] || BENCHMARK_DATA.standard_cylinders["2xLP85"];
+      const spec = getCylinderSpec(cylKey, "2xLP85");
       const defaultFill = isMetric ? spec.rated_bar : spec.rated_psi;
 
       const fillPressure = Math.max(10, readNumericInput("u4-fill-pressure", defaultFill));
@@ -3337,7 +3513,347 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
     }
 
     const CUSTOM_PROFILES_STORAGE_KEY = "zhl16c-custom-profiles";
+    const CUSTOM_CYLINDERS_STORAGE_KEY = "zhl16c-custom-cylinders";
     const MAX_IMPORT_BYTES = 1048576;
+    const CYLINDER_ID_REGEX = /^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/;
+    const UNSAFE_CYL_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+    let cylinderModalUnitMode = "imperial";
+    let lastCylinderModalTrigger = null;
+
+    function isValidCylinderId(rawId) {
+      if (typeof rawId !== "string") return false;
+      const clean = rawId.trim();
+      return Boolean(clean) && !UNSAFE_CYL_KEYS.has(clean) && CYLINDER_ID_REGEX.test(clean);
+    }
+
+    function deriveCylinderSpec(rawName, opts) {
+      const cleanName = String(rawName || "").trim().slice(0, 64);
+      if (!cleanName) return { error: "Display name cannot be empty." };
+
+      const hasCuft = opts.rated_cuft !== null && opts.rated_cuft !== undefined && opts.rated_cuft !== "";
+      const hasPsi = opts.rated_psi !== null && opts.rated_psi !== undefined && opts.rated_psi !== "";
+      const hasLiters = opts.water_liters !== null && opts.water_liters !== undefined && opts.water_liters !== "";
+      const hasBar = opts.rated_bar !== null && opts.rated_bar !== undefined && opts.rated_bar !== "";
+
+      if (!(hasPsi || hasBar) || !(hasCuft || hasLiters)) {
+        return { error: "Provide Imperial (cuft + psi) or Metric (water liters + bar) cylinder specs." };
+      }
+
+      let rPsi = hasPsi ? Number(opts.rated_psi) : null;
+      let rBar = hasBar ? Number(opts.rated_bar) : null;
+      let rCuft = hasCuft ? Number(opts.rated_cuft) : null;
+      let wLiters = hasLiters ? Number(opts.water_liters) : null;
+
+      if ((rPsi !== null && !Number.isFinite(rPsi)) || (rBar !== null && !Number.isFinite(rBar)) ||
+          (rCuft !== null && !Number.isFinite(rCuft)) || (wLiters !== null && !Number.isFinite(wLiters))) {
+        return { error: "All numeric cylinder specifications must be finite numbers." };
+      }
+
+      if (rPsi !== null && rBar === null) {
+        rBar = Math.round((rPsi * (P0_BAR / P0_PSI)) * 10) / 10;
+      } else if (rBar !== null && rPsi === null) {
+        rPsi = Math.round((rBar * (P0_PSI / P0_BAR)) * 10) / 10;
+      }
+
+      if (rPsi < 100 || rPsi > 6000) return { error: "Working pressure must be between 100 and 6000 psi." };
+      if (rBar < 10 || rBar > 420) return { error: "Working pressure must be between 10 and 420 bar." };
+
+      if (rCuft !== null && wLiters === null) {
+        if (rCuft <= 0 || rCuft > 1000) return { error: "Rated capacity must be in (0, 1000] cuft." };
+        wLiters = Math.round(((rCuft * CUFT_TO_LITERS) / (rBar / P0_BAR)) * 100) / 100;
+      } else if (wLiters !== null && rCuft === null) {
+        if (wLiters <= 0 || wLiters > 200) return { error: "Water volume must be in (0, 200] L." };
+        rCuft = Math.round(((wLiters * (rBar / P0_BAR)) / CUFT_TO_LITERS) * 10) / 10;
+      }
+
+      if (rCuft <= 0 || rCuft > 1000) return { error: "Rated capacity must be in (0, 1000] cuft." };
+      if (wLiters <= 0 || wLiters > 200) return { error: "Water volume must be in (0, 200] L." };
+
+      return {
+        spec: {
+          name: cleanName,
+          rated_cuft: Math.round(rCuft * 10) / 10,
+          rated_psi: Math.round(rPsi * 10) / 10,
+          water_liters: Math.round(wLiters * 100) / 100,
+          rated_bar: Math.round(rBar * 10) / 10
+        }
+      };
+    }
+
+    function sanitizeImportedCylinder(cid, rawSpec) {
+      if (!isValidCylinderId(cid) || !rawSpec || typeof rawSpec !== "object") return null;
+      const cleanId = cid.trim();
+      if (Object.prototype.hasOwnProperty.call(BENCHMARK_DATA.standard_cylinders, cleanId)) return null;
+      const derived = deriveCylinderSpec(rawSpec.name || cleanId, rawSpec);
+      return derived && derived.spec ? { id: cleanId, spec: derived.spec } : null;
+    }
+
+    function getBrowserCustomCylinders() {
+      try {
+        const raw = localStorage.getItem(CUSTOM_CYLINDERS_STORAGE_KEY);
+        if (!raw) return {};
+        const parsed = stripUnsafeKeys(JSON.parse(raw));
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+        const cleanMap = {};
+        Object.keys(parsed).slice(0, 50).forEach(cid => {
+          const ok = sanitizeImportedCylinder(cid, parsed[cid]);
+          if (ok) cleanMap[ok.id] = ok.spec;
+        });
+        return cleanMap;
+      } catch (e) {
+        return {};
+      }
+    }
+
+    function saveBrowserCustomCylinders(cylMap) {
+      try {
+        localStorage.setItem(CUSTOM_CYLINDERS_STORAGE_KEY, JSON.stringify(cylMap));
+      } catch (e) {
+        // Storage unavailable
+      }
+    }
+
+    function getAllCylinders() {
+      const merged = {};
+      const builtins = BENCHMARK_DATA.standard_cylinders || {};
+      Object.keys(builtins).forEach(k => {
+        merged[k] = { ...builtins[k], _source: "builtin" };
+      });
+      const cliCustom = BENCHMARK_DATA.custom_cylinders || {};
+      Object.keys(cliCustom).forEach(k => {
+        if (!Object.prototype.hasOwnProperty.call(merged, k)) {
+          merged[k] = { ...cliCustom[k], _source: "cli" };
+        }
+      });
+      const browserCustom = getBrowserCustomCylinders();
+      Object.keys(browserCustom).forEach(k => {
+        if (!Object.prototype.hasOwnProperty.call(builtins, k)) {
+          merged[k] = { ...browserCustom[k], _source: "browser" };
+        }
+      });
+      return merged;
+    }
+
+    function getCylinderSpec(cylKey, fallbackKey = "AL80") {
+      const all = getAllCylinders();
+      if (cylKey && Object.prototype.hasOwnProperty.call(all, cylKey)) return all[cylKey];
+      if (fallbackKey && Object.prototype.hasOwnProperty.call(all, fallbackKey)) return all[fallbackKey];
+      return all["AL80"] || BENCHMARK_DATA.standard_cylinders["AL80"];
+    }
+
+    function formatCylinderOptionLabel(id, spec) {
+      return `${id} - ${spec.name} (${spec.rated_cuft} cuft @ ${Math.round(spec.rated_psi)} psi | ${spec.water_liters}L @ ${Math.round(spec.rated_bar)} bar)`;
+    }
+
+    function buildGasTableCylinderOptionsHtml(selectedKey) {
+      const all = getAllCylinders();
+      const customKeys = Object.keys(all).filter(k => all[k]._source !== "builtin");
+      const builtinKeys = Object.keys(all).filter(k => all[k]._source === "builtin");
+      const optHtml = k => `<option value="${escapeHtml(k)}" ${selectedKey === k ? "selected" : ""}>${escapeHtml(k)}</option>`;
+      if (customKeys.length > 0) {
+        return `<optgroup label="Custom">${customKeys.map(optHtml).join("")}</optgroup><optgroup label="Standard">${builtinKeys.map(optHtml).join("")}</optgroup>`;
+      }
+      return builtinKeys.map(optHtml).join("");
+    }
+
+    function populateCylinderSelect(selectId, defaultKey) {
+      const sel = document.getElementById(selectId);
+      if (!sel) return;
+      const all = getAllCylinders();
+      const customKeys = Object.keys(all).filter(k => all[k]._source !== "builtin");
+      const builtinKeys = Object.keys(all).filter(k => all[k]._source === "builtin");
+      const attrDef = sel.getAttribute ? sel.getAttribute("data-default-cylinder") : null;
+      const fallback = attrDef || defaultKey || "AL80";
+      const prevVal = sel.value;
+      const chosen = (prevVal && Object.prototype.hasOwnProperty.call(all, prevVal))
+        ? prevVal
+        : (Object.prototype.hasOwnProperty.call(all, fallback) ? fallback : (builtinKeys[0] || "AL80"));
+
+      const optHtml = k => `<option value="${escapeHtml(k)}" ${chosen === k ? "selected" : ""}>${escapeHtml(formatCylinderOptionLabel(k, all[k]))}</option>`;
+      if (customKeys.length > 0) {
+        sel.innerHTML = `<optgroup label="Custom Cylinders">${customKeys.map(optHtml).join("")}</optgroup><optgroup label="Standard Cylinders">${builtinKeys.map(optHtml).join("")}</optgroup>`;
+      } else {
+        sel.innerHTML = `<optgroup label="Standard Cylinders">${builtinKeys.map(optHtml).join("")}</optgroup>`;
+      }
+      sel.value = chosen;
+    }
+
+    function populateAllCylinderDropdowns() {
+      populateCylinderSelect("u1-cylinder", "AL80");
+      populateCylinderSelect("u3-cylinder", "2xLP85");
+      populateCylinderSelect("u4-cylinder", "2xLP85");
+      renderGasInventoryTable();
+    }
+
+    function showCylinderModalAlert(msg, isError = true) {
+      const box = document.getElementById("cyl-modal-alert");
+      if (!box) return;
+      if (!msg) {
+        box.style.display = "none";
+        box.innerHTML = "";
+        return;
+      }
+      box.style.display = "block";
+      box.innerHTML = isError
+        ? `<div class="alert-item">${escapeHtml(msg)}</div>`
+        : `<div class="modal-preview-box" style="color:var(--status-positive-text);border-color:var(--status-positive);">${escapeHtml(msg)}</div>`;
+    }
+
+    function setCylinderModalUnitMode(mode) {
+      cylinderModalUnitMode = (mode === "metric") ? "metric" : "imperial";
+      const btnImp = document.getElementById("cyl-unit-imperial");
+      const btnMet = document.getElementById("cyl-unit-metric");
+      const grpImp = document.getElementById("cyl-inputs-imperial");
+      const grpMet = document.getElementById("cyl-inputs-metric");
+      if (btnImp) {
+        btnImp.classList.toggle("active", cylinderModalUnitMode === "imperial");
+        btnImp.setAttribute("aria-pressed", cylinderModalUnitMode === "imperial" ? "true" : "false");
+      }
+      if (btnMet) {
+        btnMet.classList.toggle("active", cylinderModalUnitMode === "metric");
+        btnMet.setAttribute("aria-pressed", cylinderModalUnitMode === "metric" ? "true" : "false");
+      }
+      if (grpImp) grpImp.style.display = cylinderModalUnitMode === "imperial" ? "grid" : "none";
+      if (grpMet) grpMet.style.display = cylinderModalUnitMode === "metric" ? "grid" : "none";
+      updateCylinderConversionPreview();
+    }
+
+    function updateCylinderConversionPreview() {
+      const box = document.getElementById("cyl-conversion-preview");
+      if (!box) return;
+      const idVal = (document.getElementById("cyl-input-id") && document.getElementById("cyl-input-id").value.trim()) || "Custom";
+      const nameVal = (document.getElementById("cyl-input-name") && document.getElementById("cyl-input-name").value.trim()) || idVal;
+      const opts = cylinderModalUnitMode === "imperial"
+        ? {
+            rated_cuft: readNumericInput("cyl-input-cuft", NaN),
+            rated_psi: readNumericInput("cyl-input-psi", NaN)
+          }
+        : {
+            water_liters: readNumericInput("cyl-input-liters", NaN),
+            rated_bar: readNumericInput("cyl-input-bar", NaN)
+          };
+      const res = deriveCylinderSpec(nameVal, opts);
+      if (res.error) {
+        box.textContent = `[PREVIEW] ${res.error}`;
+        return;
+      }
+      const s = res.spec;
+      if (cylinderModalUnitMode === "imperial") {
+        box.textContent = `Auto-derived Metric equivalent: ${s.water_liters} L water volume @ ${s.rated_bar} bar`;
+      } else {
+        box.textContent = `Auto-derived Imperial equivalent: ${s.rated_cuft} cuft @ ${s.rated_psi} psi`;
+      }
+    }
+
+    function renderCustomCylindersTable() {
+      const tbody = document.getElementById("custom-cylinders-tbody");
+      if (!tbody) return;
+      const all = getAllCylinders();
+      const customKeys = Object.keys(all).filter(k => all[k]._source !== "builtin");
+      if (!customKeys.length) {
+        tbody.innerHTML = `<tr><td colspan="6" style="color:var(--text-secondary);">No custom cylinder types added yet. Add one above or via CLI.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = customKeys.map(cid => {
+        const s = all[cid];
+        const srcTag = s._source === "browser" ? "[BROWSER]" : "[CLI]";
+        const actionCell = s._source === "browser"
+          ? `<button type="button" class="btn btn-sm" aria-label="Delete custom cylinder ${escapeHtml(cid)}" onclick="deleteBrowserCustomCylinder('${escapeHtml(cid)}')">Delete</button>`
+          : `<span style="color:var(--text-secondary);font-size:0.75rem;">Manage via CLI</span>`;
+        return `
+          <tr>
+            <td><strong>${escapeHtml(cid)}</strong></td>
+            <td>${escapeHtml(s.name)}</td>
+            <td>${s.rated_cuft} cuft @ ${Math.round(s.rated_psi)} psi</td>
+            <td>${s.water_liters} L @ ${Math.round(s.rated_bar)} bar</td>
+            <td><span class="status-badge status-nominal">${srcTag}</span></td>
+            <td>${actionCell}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function openCylinderManagerModal(triggerBtn) {
+      lastCylinderModalTrigger = triggerBtn || null;
+      const modal = document.getElementById("cylinder-manager-modal");
+      if (!modal) return;
+      showCylinderModalAlert("");
+      setCylinderModalUnitMode(appState.depthUnits === "meters" ? "metric" : "imperial");
+      renderCustomCylindersTable();
+      modal.removeAttribute("hidden");
+      const idInput = document.getElementById("cyl-input-id");
+      if (idInput && idInput.focus) idInput.focus();
+    }
+
+    function closeCylinderManagerModal() {
+      const modal = document.getElementById("cylinder-manager-modal");
+      if (modal) modal.setAttribute("hidden", "");
+      if (lastCylinderModalTrigger && lastCylinderModalTrigger.focus) {
+        lastCylinderModalTrigger.focus();
+      }
+      lastCylinderModalTrigger = null;
+    }
+
+    function saveCustomCylinderFromModal() {
+      const idEl = document.getElementById("cyl-input-id");
+      const nameEl = document.getElementById("cyl-input-name");
+      const rawId = idEl ? idEl.value.trim() : "";
+      if (!isValidCylinderId(rawId)) {
+        showCylinderModalAlert("[INVALID ID] Cylinder ID must be 1-32 ASCII chars matching [A-Za-z0-9._-] starting with a letter or digit.", true);
+        return false;
+      }
+      if (Object.prototype.hasOwnProperty.call(BENCHMARK_DATA.standard_cylinders, rawId)) {
+        showCylinderModalAlert(`[BUILT-IN PROTECTED] '${rawId}' is a standard built-in cylinder and cannot be overwritten. Choose a custom ID.`, true);
+        return false;
+      }
+      const rawName = (nameEl && nameEl.value.trim()) ? nameEl.value.trim() : rawId;
+      const opts = cylinderModalUnitMode === "imperial"
+        ? {
+            rated_cuft: readNumericInput("cyl-input-cuft", NaN),
+            rated_psi: readNumericInput("cyl-input-psi", NaN)
+          }
+        : {
+            water_liters: readNumericInput("cyl-input-liters", NaN),
+            rated_bar: readNumericInput("cyl-input-bar", NaN)
+          };
+      const derived = deriveCylinderSpec(rawName, opts);
+      if (derived.error) {
+        showCylinderModalAlert(`[INVALID SPEC] ${derived.error}`, true);
+        return false;
+      }
+      const browserMap = getBrowserCustomCylinders();
+      browserMap[rawId] = derived.spec;
+      saveBrowserCustomCylinders(browserMap);
+      populateAllCylinderDropdowns();
+      recomputeDashboard();
+      runAllUtilities();
+      renderCustomCylindersTable();
+      showCylinderModalAlert(`[SAVED] '${rawId}' (${derived.spec.rated_cuft} cuft @ ${Math.round(derived.spec.rated_psi)} psi | ${derived.spec.water_liters} L @ ${Math.round(derived.spec.rated_bar)} bar) added to Dive Planner and Diver Tools.`, false);
+      flashProfileStatus(`[SAVED CYLINDER: ${rawId}]`);
+      if (idEl) idEl.value = "";
+      if (nameEl) nameEl.value = "";
+      return true;
+    }
+
+    function deleteBrowserCustomCylinder(cid) {
+      const browserMap = getBrowserCustomCylinders();
+      if (!Object.prototype.hasOwnProperty.call(browserMap, cid)) return false;
+      delete browserMap[cid];
+      saveBrowserCustomCylinders(browserMap);
+      const allAfter = getAllCylinders();
+      appState.gases.forEach(g => {
+        if (!Object.prototype.hasOwnProperty.call(allAfter, g.cylinder_preset)) {
+          g.cylinder_preset = "AL80";
+        }
+      });
+      populateAllCylinderDropdowns();
+      recomputeDashboard();
+      runAllUtilities();
+      renderCustomCylindersTable();
+      showCylinderModalAlert(`[DELETED] Removed custom cylinder '${cid}'.`, false);
+      flashProfileStatus(`[DELETED CYLINDER: ${cid}]`);
+      return true;
+    }
 
     function getCustomProfiles() {
       try {
@@ -3357,12 +3873,15 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
     function clearAllLocalData() {
       try {
         localStorage.removeItem(CUSTOM_PROFILES_STORAGE_KEY);
+        localStorage.removeItem(CUSTOM_CYLINDERS_STORAGE_KEY);
         localStorage.removeItem("theme-preference");
       } catch (e) {
         // Storage unavailable
       }
       currentThemeMode = "light";
       applyEffectiveTheme("light");
+      populateAllCylinderDropdowns();
+      renderCustomCylindersTable();
       const firstId = BENCHMARK_DATA.profiles[0] && BENCHMARK_DATA.profiles[0].profile_id;
       populatePresetDropdown(firstId);
       if (firstId) loadBenchmarkPreset(firstId);
@@ -3499,7 +4018,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       'You MUST independently verify all outputs, confirm any dive plan or gas blend with a certified dive professional, instructor, or gas blender, ' +
       'and physically analyze every cylinder (O2/He) before diving. Provided "AS IS" under Apache License 2.0 (see LICENSE, NOTICE, legal/terms.md); you assume all risk.';
 
-    function exportProfilesJson() {
+    function buildExportPayload() {
       const customList = getCustomProfiles();
       const currentEntry = {
         profile_id: "exported-active-profile",
@@ -3507,12 +4026,17 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
         scenario_type: "Exported Dive Profile",
         config: buildConfigObjectFromCurrentUi()
       };
-      const exportPayload = {
+      return {
         dataset_name: "exported_technical_dive_profiles",
-        description: "Exported technical scuba diving profiles.",
+        description: "Exported technical scuba diving profiles and custom cylinder types.",
         safety_notice: SAFETY_VERIFICATION_NOTICE,
+        custom_cylinders: getBrowserCustomCylinders(),
         profiles: customList.length > 0 ? customList : [currentEntry]
       };
+    }
+
+    function exportProfilesJson() {
+      const exportPayload = buildExportPayload();
       const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -3545,7 +4069,8 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       }
       const allowedRoles = ["bottom", "travel", "deco", "diluent", "bailout"];
       const role = allowedRoles.includes(rawGas.role) ? rawGas.role : fallbackRole;
-      const cyl = Object.prototype.hasOwnProperty.call(BENCHMARK_DATA.standard_cylinders, rawGas.cylinder_preset)
+      const allCyls = getAllCylinders();
+      const cyl = Object.prototype.hasOwnProperty.call(allCyls, rawGas.cylinder_preset)
         ? rawGas.cylinder_preset
         : "AL80";
       const startPsi = Number(rawGas.start_pressure_psi);
@@ -3622,6 +4147,55 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       };
     }
 
+    function applyImportedJsonPayload(rawParsed) {
+      const parsed = stripUnsafeKeys(rawParsed);
+      if (!parsed || typeof parsed !== "object") {
+        return { importedProfiles: 0, importedCylinders: 0, firstId: null };
+      }
+
+      // 1. Import custom cylinders FIRST so imported profiles referencing them resolve cleanly
+      let importedCylinders = 0;
+      if (parsed.custom_cylinders && typeof parsed.custom_cylinders === "object" && !Array.isArray(parsed.custom_cylinders)) {
+        const browserMap = getBrowserCustomCylinders();
+        Object.keys(parsed.custom_cylinders).slice(0, 50).forEach(cid => {
+          const clean = sanitizeImportedCylinder(cid, parsed.custom_cylinders[cid]);
+          if (clean) {
+            browserMap[clean.id] = clean.spec;
+            importedCylinders += 1;
+          }
+        });
+        if (importedCylinders > 0) {
+          saveBrowserCustomCylinders(browserMap);
+          populateAllCylinderDropdowns();
+          renderCustomCylindersTable();
+        }
+      }
+
+      // 2. Import profiles
+      const incoming = Array.isArray(parsed.profiles) ? parsed.profiles : (parsed.config ? [parsed] : []);
+      const customList = getCustomProfiles();
+      let firstId = null;
+      let importedProfiles = 0;
+      incoming.slice(0, 50).forEach((item, idx) => {
+        const rawCfg = item && (item.config || (item.plan && item.plan.config));
+        const cfg = sanitizeImportedConfig(rawCfg);
+        if (!cfg) return;
+        const rawId = String(item.profile_id || ("imported-profile-" + (idx + 1))).replace(/[^a-zA-Z0-9_-]+/g, "-").slice(0, 64);
+        const pid = rawId || ("imported-profile-" + (idx + 1));
+        if (!firstId) firstId = pid;
+        const title = String(item.title || pid).trim().slice(0, 120) || pid;
+        const newEntry = { profile_id: pid, title, scenario_type: "Imported Profile", config: cfg };
+        const existIdx = customList.findIndex(p => p.profile_id === pid);
+        if (existIdx >= 0) customList[existIdx] = newEntry;
+        else customList.unshift(newEntry);
+        importedProfiles += 1;
+      });
+      if (importedProfiles > 0) {
+        saveCustomProfiles(customList);
+      }
+      return { importedProfiles, importedCylinders, firstId };
+    }
+
     function importProfilesJson(event) {
       const file = event.target.files && event.target.files[0];
       if (!file) return;
@@ -3633,39 +4207,24 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       const reader = new FileReader();
       reader.onload = function(evt) {
         try {
-          const parsed = stripUnsafeKeys(JSON.parse(evt.target.result));
-          const incoming = Array.isArray(parsed.profiles) ? parsed.profiles : (parsed.config ? [parsed] : []);
-          if (!incoming.length) {
-            flashProfileStatus("[INVALID PROFILE JSON]", true);
+          const parsed = JSON.parse(evt.target.result);
+          const summary = applyImportedJsonPayload(parsed);
+          if (!summary.importedProfiles && !summary.importedCylinders) {
+            flashProfileStatus("[NO VALID PROFILES OR CYLINDERS FOUND]", true);
             return;
           }
-          const customList = getCustomProfiles();
-          let firstId = null;
-          let importedCount = 0;
-          incoming.slice(0, 50).forEach((item, idx) => {
-            const rawCfg = item && (item.config || (item.plan && item.plan.config));
-            const cfg = sanitizeImportedConfig(rawCfg);
-            if (!cfg) return;
-            const rawId = String(item.profile_id || ("imported-profile-" + (idx + 1))).replace(/[^a-zA-Z0-9_-]+/g, "-").slice(0, 64);
-            const pid = rawId || ("imported-profile-" + (idx + 1));
-            if (!firstId) firstId = pid;
-            const title = String(item.title || pid).trim().slice(0, 120) || pid;
-            const newEntry = { profile_id: pid, title, scenario_type: "Imported Profile", config: cfg };
-            const existIdx = customList.findIndex(p => p.profile_id === pid);
-            if (existIdx >= 0) customList[existIdx] = newEntry;
-            else customList.unshift(newEntry);
-            importedCount += 1;
-          });
-          if (!importedCount) {
-            flashProfileStatus("[NO VALID PROFILES FOUND]", true);
-            return;
+          if (summary.firstId) {
+            populatePresetDropdown(summary.firstId);
+            loadBenchmarkPreset(summary.firstId);
+          } else {
+            recomputeDashboard();
+            runAllUtilities();
           }
-          saveCustomProfiles(customList);
-          if (firstId) {
-            populatePresetDropdown(firstId);
-            loadBenchmarkPreset(firstId);
-            flashProfileStatus("[IMPORTED PROFILES]");
-          }
+          flashProfileStatus(
+            summary.importedCylinders > 0 && summary.importedProfiles > 0
+              ? "[IMPORTED PROFILES & CYLINDERS]"
+              : (summary.importedCylinders > 0 ? "[IMPORTED CYLINDERS]" : "[IMPORTED PROFILES]")
+          );
         } catch (err) {
           flashProfileStatus("[JSON PARSE ERROR]", true);
         } finally {
@@ -3741,6 +4300,7 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
 
     window.addEventListener("DOMContentLoaded", () => {
       applyEffectiveTheme(currentThemeMode);
+      populateAllCylinderDropdowns();
       const sel = document.getElementById("preset-select");
       const customList = getCustomProfiles();
       const initialId = (customList[0] && customList[0].profile_id) ||
@@ -3756,6 +4316,14 @@ def generate_dashboard_html(benchmarks: Dict[str, Any]) -> str:
       }
       window.addEventListener("resize", () => {
         if (appState.lastPlanResult) renderProfileSvg(appState.lastPlanResult, appState.depthUnits);
+      });
+      document.addEventListener("keydown", evt => {
+        if (evt.key === "Escape") {
+          const modal = document.getElementById("cylinder-manager-modal");
+          if (modal && !modal.hasAttribute("hidden")) {
+            closeCylinderManagerModal();
+          }
+        }
       });
     });
   </script>

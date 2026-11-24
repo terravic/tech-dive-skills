@@ -20,6 +20,7 @@ import json
 import logging
 import math
 from pathlib import Path
+import re
 import sys
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -786,6 +787,92 @@ def virial_z_factor(p_bar: float, f_o2: float, f_he: float) -> float:
     return f_o2 * z_o2 + f_n2 * z_n2 + f_he * z_he
 
 
+CUFT_TO_LITERS: float = 28.316846592
+CYLINDER_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$")
+UNSAFE_OBJECT_KEYS = frozenset({"__proto__", "constructor", "prototype"})
+
+
+def validate_cylinder_id(cylinder_id: str) -> str:
+    """Validates a cylinder preset identifier for safe CLI, JSON, and browser DOM usage."""
+    if not isinstance(cylinder_id, str):
+        raise DivePlannerValidationError("ERR_CYLINDER_ID", "Cylinder ID must be a string.")
+    clean = cylinder_id.strip()
+    if not clean or clean in UNSAFE_OBJECT_KEYS or not CYLINDER_ID_PATTERN.match(clean):
+        raise DivePlannerValidationError(
+            "ERR_CYLINDER_ID",
+            f"Invalid cylinder ID '{cylinder_id}'. Use 1-32 ASCII characters matching [A-Za-z0-9._-] starting with a letter or digit.",
+        )
+    return clean
+
+
+def build_cylinder_spec(
+    name: str,
+    rated_cuft: Optional[float] = None,
+    rated_psi: Optional[float] = None,
+    water_liters: Optional[float] = None,
+    rated_bar: Optional[float] = None,
+) -> Dict[str, Any]:
+    """Builds and validates a complete cylinder specification, deriving 1:1 Imperial/Metric equivalents (or preserving explicit 4-value inputs)."""
+    if not isinstance(name, str) or not name.strip():
+        raise DivePlannerValidationError("ERR_CYLINDER_SPEC", "Cylinder display name cannot be empty.")
+    clean_name = name.strip()[:64]
+
+    has_cuft = rated_cuft is not None
+    has_psi = rated_psi is not None
+    has_liters = water_liters is not None
+    has_bar = rated_bar is not None
+
+    if not (has_psi or has_bar):
+        raise DivePlannerValidationError(
+            "ERR_CYLINDER_SPEC",
+            "Must provide working pressure via --rated-psi (Imperial) or --rated-bar (Metric).",
+        )
+    if not (has_cuft or has_liters):
+        raise DivePlannerValidationError(
+            "ERR_CYLINDER_SPEC",
+            "Must provide cylinder capacity via --rated-cuft (Imperial) or --water-liters (Metric).",
+        )
+
+    r_psi = _require_finite("rated_psi", rated_psi, "ERR_CYLINDER_SPEC") if has_psi else None
+    r_bar = _require_finite("rated_bar", rated_bar, "ERR_CYLINDER_SPEC") if has_bar else None
+    r_cuft = _require_finite("rated_cuft", rated_cuft, "ERR_CYLINDER_SPEC") if has_cuft else None
+    w_liters = _require_finite("water_liters", water_liters, "ERR_CYLINDER_SPEC") if has_liters else None
+
+    if r_psi is not None and r_bar is None:
+        r_bar = round(r_psi * (P0_BAR / P0_PSI), 1)
+    elif r_bar is not None and r_psi is None:
+        r_psi = round(r_bar * (P0_PSI / P0_BAR), 1)
+
+    assert r_psi is not None and r_bar is not None
+    if r_psi < 100.0 or r_psi > 6000.0:
+        raise DivePlannerValidationError("ERR_CYLINDER_SPEC", f"rated_psi must be between 100 and 6000 psi, got {r_psi}.")
+    if r_bar < 10.0 or r_bar > 420.0:
+        raise DivePlannerValidationError("ERR_CYLINDER_SPEC", f"rated_bar must be between 10 and 420 bar, got {r_bar}.")
+
+    if r_cuft is not None and w_liters is None:
+        if r_cuft <= 0.0 or r_cuft > 1000.0:
+            raise DivePlannerValidationError("ERR_CYLINDER_SPEC", f"rated_cuft must be in (0, 1000], got {r_cuft}.")
+        w_liters = round((r_cuft * CUFT_TO_LITERS) / (r_bar / P0_BAR), 2)
+    elif w_liters is not None and r_cuft is None:
+        if w_liters <= 0.0 or w_liters > 200.0:
+            raise DivePlannerValidationError("ERR_CYLINDER_SPEC", f"water_liters must be in (0, 200], got {w_liters}.")
+        r_cuft = round((w_liters * (r_bar / P0_BAR)) / CUFT_TO_LITERS, 1)
+
+    assert r_cuft is not None and w_liters is not None
+    if r_cuft <= 0.0 or r_cuft > 1000.0:
+        raise DivePlannerValidationError("ERR_CYLINDER_SPEC", f"rated_cuft must be in (0, 1000], got {r_cuft}.")
+    if w_liters <= 0.0 or w_liters > 200.0:
+        raise DivePlannerValidationError("ERR_CYLINDER_SPEC", f"water_liters must be in (0, 200], got {w_liters}.")
+
+    return {
+        "name": clean_name,
+        "rated_cuft": round(r_cuft, 1),
+        "rated_psi": round(r_psi, 1),
+        "water_liters": round(w_liters, 2),
+        "rated_bar": round(r_bar, 1),
+    }
+
+
 def calculate_cylinder_fill_capacity(
     cylinder_preset: str = "AL80",
     fill_pressure: float = 3000.0,
@@ -795,6 +882,7 @@ def calculate_cylinder_fill_capacity(
     custom_rated_cuft: Optional[float] = None,
     custom_rated_psi: Optional[float] = None,
     custom_water_liters: Optional[float] = None,
+    profiles_file: Optional[Path] = None,
 ) -> Dict[str, Any]:
     """Tool 3 Mode D: Calculates Ideal and Real-Gas (Z-factor) deliverable volume of a cylinder."""
     validate_gas_fractions(f_o2, f_he)
@@ -802,7 +890,17 @@ def calculate_cylinder_fill_capacity(
     if fill_pressure <= 0.0:
         raise DivePlannerValidationError("ERR_PRESSURE", f"Fill pressure must be > 0, got {fill_pressure}.")
 
-    spec = STANDARD_CYLINDERS.get(cylinder_preset, STANDARD_CYLINDERS["AL80"]).copy()
+    catalog = get_cylinder_catalog(profiles_file)
+    if cylinder_preset in catalog:
+        spec = catalog[cylinder_preset].copy()
+    elif any(v is not None for v in (custom_rated_cuft, custom_rated_psi, custom_water_liters)):
+        spec = STANDARD_CYLINDERS["AL80"].copy()
+    else:
+        raise DivePlannerValidationError(
+            "ERR_CYLINDER_ID",
+            f"Unknown cylinder preset '{cylinder_preset}'. Run 'cylinders --action list' to view available types or 'cylinders --action save' to add a custom cylinder.",
+        )
+
     if custom_rated_cuft is not None and custom_rated_cuft > 0:
         spec["rated_cuft"] = custom_rated_cuft
     if custom_rated_psi is not None and custom_rated_psi > 0:
@@ -853,6 +951,7 @@ def calculate_gas_blender(
     topup_f_he: float = 0.0,
     pressure_units: str = "psi",
     cylinder_preset: str = "2xLP85",
+    profiles_file: Optional[Path] = None,
 ) -> Dict[str, Any]:
     """Tool 3 (Modes A, B, C, D): Nitrox/Trimix Partial-Pressure Blender, Top-Up, and Fill Capacity."""
     start_f_n2 = validate_gas_fractions(start_f_o2, start_f_he, "Starting Gas")
@@ -883,6 +982,7 @@ def calculate_gas_blender(
             pressure_units=pressure_units,
             f_o2=final_o2,
             f_he=final_he,
+            profiles_file=profiles_file,
         )
         props = calculate_ead_end_mod_density(
             depth=100.0,
@@ -972,6 +1072,7 @@ def calculate_gas_blender(
         pressure_units=pressure_units,
         f_o2=target_f_o2,
         f_he=target_f_he,
+        profiles_file=profiles_file,
     )
 
     return {
@@ -1249,6 +1350,7 @@ def _execute_single_schedule(
     initial_he: Optional[List[float]] = None,
     initial_cns: float = 0.0,
     initial_otu: float = 0.0,
+    profiles_file: Optional[Path] = None,
 ) -> Dict[str, Any]:
     """Executes the full descent, bottom, ascent, and ZH-L16C + GF decompression schedule."""
     cfg.validate()
@@ -1693,6 +1795,7 @@ def _execute_single_schedule(
             pressure_units="psi",
             f_o2=g.f_o2,
             f_he=g.f_he,
+            profiles_file=profiles_file,
         )
         total_avail = cap["ideal_volume_cuft"] if cfg.volume_units == "cuft" else cap["ideal_volume_liters"]
         pct_used = (used_vol / total_avail * 100.0) if total_avail > 0 else 0.0
@@ -1773,6 +1876,7 @@ def plan_dive(
     initial_cns: float = 0.0,
     initial_otu: float = 0.0,
     allow_helium: bool = True,
+    profiles_file: Optional[Path] = None,
 ) -> Dict[str, Any]:
     """Executes Variant 1 / Primary Dive Planning for OC, CCR, and CCR + Bailout."""
     cfg.validate()
@@ -1837,6 +1941,7 @@ def plan_dive(
         initial_he=initial_he,
         initial_cns=initial_cns,
         initial_otu=initial_otu,
+        profiles_file=profiles_file,
     )
 
     bailout_plan: Optional[Dict[str, Any]] = None
@@ -1848,6 +1953,7 @@ def plan_dive(
             initial_he=initial_he,
             initial_cns=initial_cns,
             initial_otu=initial_otu,
+            profiles_file=profiles_file,
         )
         bailout_plan.pop("_final_n2_raw", None)
         bailout_plan.pop("_final_he_raw", None)
@@ -1910,6 +2016,7 @@ def solve_max_time_at_depth(
     depth_units: str = "feet",
     volume_units: str = "cuft",
     comp1_variant: str = "1b",
+    profiles_file: Optional[Path] = None,
 ) -> Dict[str, Any]:
     """Variant 3A: Solves for NDL, Tank-Limited Max Bottom Time, and CNS-Limited Bottom Time at depth."""
     validate_gas_fractions(f_o2, f_he)
@@ -1930,6 +2037,7 @@ def solve_max_time_at_depth(
         pressure_units="psi",
         f_o2=f_o2,
         f_he=f_he,
+        profiles_file=profiles_file,
     )
     total_vol = cap["ideal_volume_cuft"] if volume_units == "cuft" else cap["ideal_volume_liters"]
     usable_fraction = 2.0 / 3.0 if reserve_rule == "thirds" else (0.50 if reserve_rule == "half" else 0.90)
@@ -1959,7 +2067,7 @@ def solve_max_time_at_depth(
                 )
             ],
         )
-        res = _execute_single_schedule(cfg, schedule_mode="OC")
+        res = _execute_single_schedule(cfg, schedule_mode="OC", profiles_file=profiles_file)
         vol_used = sum(c["volume_consumed"] for c in res["cylinder_logistics"])
         return res["summary"]["is_deco_dive"], vol_used, res["summary"]["final_cns_pct"]
 
@@ -2032,6 +2140,7 @@ def solve_max_depth_envelope(
     elevation_ft: float = 0.0,
     depth_units: str = "feet",
     volume_units: str = "cuft",
+    profiles_file: Optional[Path] = None,
 ) -> Dict[str, Any]:
     """Variant 2: Given tank size and gas type, calculates how deep the diver can safely go."""
     validate_gas_fractions(f_o2, f_he)
@@ -2069,6 +2178,7 @@ def solve_max_depth_envelope(
         pressure_units="psi",
         f_o2=f_o2,
         f_he=f_he,
+        profiles_file=profiles_file,
     )
     total_vol = cap["ideal_volume_cuft"] if volume_units == "cuft" else cap["ideal_volume_liters"]
     usable_fraction = 2.0 / 3.0 if reserve_rule == "thirds" else (0.50 if reserve_rule == "half" else 0.90)
@@ -2096,6 +2206,7 @@ def solve_max_depth_envelope(
             elevation_ft=elevation_ft,
             depth_units=depth_units,
             volume_units=volume_units,
+            profiles_file=profiles_file,
         )
         if t_info["tank_limited_max_bottom_time_min"] >= min_practical_bottom_time_min:
             gas_volume_max_depth = d_cur
@@ -2162,6 +2273,7 @@ def solve_rock_bottom(
     elevation_ft: float = 0.0,
     depth_units: str = "feet",
     volume_units: str = "cuft",
+    profiles_file: Optional[Path] = None,
 ) -> Dict[str, Any]:
     """Variant 3B: Computes Minimum Gas ('Rock Bottom') and Turn Pressure for team gas sharing."""
     depth = _require_finite("depth", depth, "ERR_DEPTH_TIME")
@@ -2197,6 +2309,7 @@ def solve_rock_bottom(
         pressure_units="psi",
         f_o2=f_o2,
         f_he=f_he,
+        profiles_file=profiles_file,
     )
     total_vol = cap["ideal_volume_cuft"] if volume_units == "cuft" else cap["ideal_volume_liters"]
     psi_per_unit = fill_pressure_psi / max(1e-6, total_vol)
@@ -2739,6 +2852,175 @@ def delete_profile_from_store(
     }
 
 
+def load_custom_cylinders(profiles_file: Optional[Path] = None) -> Dict[str, Dict[str, Any]]:
+    """Loads and validates custom cylinder definitions from the JSON profile store."""
+    target_path = profiles_file or DEFAULT_PROFILES_PATH
+    if not target_path.exists():
+        return {}
+    raw = _read_json_file(target_path)
+    raw_cyls = raw.get("custom_cylinders")
+    if raw_cyls is None:
+        return {}
+    if not isinstance(raw_cyls, dict):
+        raise DivePlannerValidationError(
+            "ERR_CYLINDER_SPEC",
+            f"'custom_cylinders' in {_to_relative_path_str(target_path)} must be a JSON object.",
+        )
+    valid_custom: Dict[str, Dict[str, Any]] = {}
+    for cid, spec in raw_cyls.items():
+        if not isinstance(spec, dict):
+            continue
+        try:
+            clean_id = validate_cylinder_id(cid)
+            if clean_id in STANDARD_CYLINDERS:
+                continue
+            valid_custom[clean_id] = build_cylinder_spec(
+                name=str(spec.get("name", clean_id)),
+                rated_cuft=spec.get("rated_cuft"),
+                rated_psi=spec.get("rated_psi"),
+                water_liters=spec.get("water_liters"),
+                rated_bar=spec.get("rated_bar"),
+            )
+        except DivePlannerValidationError:
+            continue
+    return valid_custom
+
+
+def get_cylinder_catalog(profiles_file: Optional[Path] = None) -> Dict[str, Dict[str, Any]]:
+    """Returns the merged cylinder catalog (immutable STANDARD_CYLINDERS + validated custom_cylinders)."""
+    catalog: Dict[str, Dict[str, Any]] = {k: v.copy() for k, v in STANDARD_CYLINDERS.items()}
+    custom_map = load_custom_cylinders(profiles_file)
+    for cid, spec in custom_map.items():
+        if cid not in catalog:
+            catalog[cid] = spec.copy()
+    return catalog
+
+
+def list_cylinders(profiles_file: Optional[Path] = None) -> Dict[str, Any]:
+    """Lists all built-in and custom cylinder types available to CLI and dashboard."""
+    target_path = profiles_file or DEFAULT_PROFILES_PATH
+    rel_str = _to_relative_path_str(target_path)
+    custom_map = load_custom_cylinders(target_path)
+    entries: List[Dict[str, Any]] = []
+    for cid, spec in STANDARD_CYLINDERS.items():
+        entries.append({"cylinder_id": cid, "source": "builtin", **spec})
+    for cid, spec in custom_map.items():
+        entries.append({"cylinder_id": cid, "source": "custom", **spec})
+    return {
+        "profiles_file": rel_str,
+        "builtin_count": len(STANDARD_CYLINDERS),
+        "custom_count": len(custom_map),
+        "total_count": len(entries),
+        "cylinders": entries,
+    }
+
+
+def save_cylinder_to_store(
+    cylinder_id: str,
+    name: Optional[str] = None,
+    rated_cuft: Optional[float] = None,
+    rated_psi: Optional[float] = None,
+    water_liters: Optional[float] = None,
+    rated_bar: Optional[float] = None,
+    profiles_file: Optional[Path] = None,
+    rebuild_dashboard: bool = True,
+) -> Dict[str, Any]:
+    """Creates or updates a custom cylinder in the JSON store and refreshes dashboard.html."""
+    clean_id = validate_cylinder_id(cylinder_id)
+    if clean_id in STANDARD_CYLINDERS:
+        raise DivePlannerValidationError(
+            "ERR_CYLINDER_BUILTIN",
+            f"Cylinder ID '{clean_id}' is a built-in standard cylinder and cannot be overwritten. Choose a custom ID.",
+        )
+
+    display_name = name.strip() if isinstance(name, str) and name.strip() else clean_id
+    spec = build_cylinder_spec(
+        name=display_name,
+        rated_cuft=rated_cuft,
+        rated_psi=rated_psi,
+        water_liters=water_liters,
+        rated_bar=rated_bar,
+    )
+
+    target_path = profiles_file or DEFAULT_PROFILES_PATH
+    if target_path.exists():
+        raw = _read_json_file(target_path)
+    else:
+        raw = {
+            "dataset_name": "technical_dive_profiles_v2",
+            "description": "Technical scuba diving profile and custom cylinder library.",
+            "profiles": [],
+            "custom_cylinders": {},
+        }
+
+    raw_custom = raw.get("custom_cylinders")
+    if not isinstance(raw_custom, dict):
+        raw_custom = {}
+    updated = clean_id in raw_custom
+    raw_custom[clean_id] = spec
+    raw["custom_cylinders"] = raw_custom
+
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    target_path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+
+    dash_rebuilt = False
+    if rebuild_dashboard and target_path.resolve() == DEFAULT_PROFILES_PATH.resolve():
+        dash_rebuilt = _rebuild_dashboard_if_present()
+
+    return {
+        "action": "updated" if updated else "created",
+        "cylinder_id": clean_id,
+        "spec": spec,
+        "profiles_file": _to_relative_path_str(target_path),
+        "custom_count": len(raw_custom),
+        "total_cylinders": len(STANDARD_CYLINDERS) + len(raw_custom),
+        "dashboard_updated": dash_rebuilt,
+    }
+
+
+def delete_cylinder_from_store(
+    cylinder_id: str,
+    profiles_file: Optional[Path] = None,
+    rebuild_dashboard: bool = True,
+) -> Dict[str, Any]:
+    """Deletes a custom cylinder by ID from the JSON store and refreshes dashboard.html."""
+    clean_id = validate_cylinder_id(cylinder_id)
+    if clean_id in STANDARD_CYLINDERS:
+        raise DivePlannerValidationError(
+            "ERR_CYLINDER_BUILTIN",
+            f"Cylinder ID '{clean_id}' is a built-in standard cylinder and cannot be deleted.",
+        )
+
+    target_path = profiles_file or DEFAULT_PROFILES_PATH
+    rel_str = _to_relative_path_str(target_path)
+    if not target_path.exists():
+        raise DivePlannerValidationError("ERR_FILE_NOT_FOUND", f"Profiles file not found: {rel_str}")
+    raw = _read_json_file(target_path)
+    raw_custom = raw.get("custom_cylinders")
+    if not isinstance(raw_custom, dict) or clean_id not in raw_custom:
+        raise DivePlannerValidationError(
+            "ERR_CYLINDER_ID",
+            f"Custom cylinder ID '{clean_id}' not found in {rel_str}.",
+        )
+
+    del raw_custom[clean_id]
+    raw["custom_cylinders"] = raw_custom
+    target_path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+
+    dash_rebuilt = False
+    if rebuild_dashboard and target_path.resolve() == DEFAULT_PROFILES_PATH.resolve():
+        dash_rebuilt = _rebuild_dashboard_if_present()
+
+    return {
+        "action": "deleted",
+        "cylinder_id": clean_id,
+        "profiles_file": rel_str,
+        "custom_count": len(raw_custom),
+        "total_cylinders": len(STANDARD_CYLINDERS) + len(raw_custom),
+        "dashboard_updated": dash_rebuilt,
+    }
+
+
 # ---------------------------------------------------------------------------
 # CLI Formatting and Entry Point
 # ---------------------------------------------------------------------------
@@ -2794,6 +3076,14 @@ def _print_plan_table(result: Dict[str, Any]) -> None:
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
+    cyl_help = (
+        "Cylinder preset ID (run 'cylinders --action list' to view built-in and custom types, "
+        "or 'cylinders --action save' to add a new cylinder type for CLI, Dive Planner, and Diver Tools)."
+    )
+    prof_file_help = (
+        "Optional custom JSON store path for profiles and custom_cylinders "
+        "(default: assets/synthetic_dive_profiles.json)."
+    )
     parser = argparse.ArgumentParser(
         prog="zhl16c_planner",
         description="Deterministic Bühlmann ZH-L16C + Gradient Factors Dive Planner and Diver Utility CLI.",
@@ -2810,6 +3100,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_plan.add_argument("--time", type=float, default=25.0)
     p_plan.add_argument("--f-o2", type=float, default=0.21)
     p_plan.add_argument("--f-he", type=float, default=0.0)
+    p_plan.add_argument("--cylinder", type=str, default=None, help=f"Bottom gas cylinder preset ID. {cyl_help}")
+    p_plan.add_argument("--fill-psi", type=float, default=None, help="Starting bottom cylinder fill pressure in psi (defaults to cylinder rated working pressure).")
     p_plan.add_argument("--deco-gases", type=str, default="EAN50:0.50:0.0:70,O2 100%:1.00:0.0:20", help="Comma-separated name:f_o2:f_he:switch_depth")
     p_plan.add_argument("--gf-low", type=float, default=30.0)
     p_plan.add_argument("--gf-high", type=float, default=85.0)
@@ -2835,11 +3127,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_plan.add_argument("--no-helium", action="store_true", help="Restrict --auto-best-gas bottom mix selection to Nitrox / Air only (0%% He).")
     p_plan.add_argument("--save-profile-id", type=str, help="Save or update this planned dive configuration under the given profile ID.")
     p_plan.add_argument("--save-profile-title", type=str, help="Optional display title when saving the profile for the UI dropdown selector.")
-    p_plan.add_argument("--profiles-file", type=str, help="Optional custom JSON file path for reading/saving profiles (default: assets/synthetic_dive_profiles.json).")
+    p_plan.add_argument("--profiles-file", type=str, help=prof_file_help)
 
     # 2. max-depth
     p_md = sub.add_parser("max-depth", help="Variant 2: Given tank size and gas mix, calculate maximum safe depth and time envelope.")
-    p_md.add_argument("--cylinder", type=str, default="AL80")
+    p_md.add_argument("--cylinder", type=str, default="AL80", help=cyl_help)
     p_md.add_argument("--fill-psi", type=float, default=3000.0)
     p_md.add_argument("--f-o2", type=float, default=0.32)
     p_md.add_argument("--f-he", type=float, default=0.0)
@@ -2848,21 +3140,23 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_md.add_argument("--reserve-rule", choices=["thirds", "half", "all"], default="thirds")
     p_md.add_argument("--depth-units", choices=["feet", "meters"], default="feet")
     p_md.add_argument("--volume-units", choices=["cuft", "liters"], default="cuft")
+    p_md.add_argument("--profiles-file", type=str, help=prof_file_help)
 
     # 3. max-time
     p_mt = sub.add_parser("max-time", help="Variant 3A: Solve for NDL, tank-limited bottom time, and CNS limit at depth.")
     p_mt.add_argument("--depth", type=float, required=True)
     p_mt.add_argument("--f-o2", type=float, default=0.32)
     p_mt.add_argument("--f-he", type=float, default=0.0)
-    p_mt.add_argument("--cylinder", type=str, default="AL80")
+    p_mt.add_argument("--cylinder", type=str, default="AL80", help=cyl_help)
     p_mt.add_argument("--fill-psi", type=float, default=3000.0)
     p_mt.add_argument("--depth-units", choices=["feet", "meters"], default="feet")
+    p_mt.add_argument("--profiles-file", type=str, help=prof_file_help)
 
     # 4. rock-bottom
     p_rb = sub.add_parser("rock-bottom", help="Variant 3B: Calculate minimum reserve gas ('rock bottom') and turn pressure.")
     p_rb.add_argument("--depth", type=float, required=True)
     p_rb.add_argument("--time", type=float, default=25.0)
-    p_rb.add_argument("--cylinder", type=str, default="2xLP85")
+    p_rb.add_argument("--cylinder", type=str, default="2xLP85", help=cyl_help)
     p_rb.add_argument("--fill-psi", type=float, default=2640.0)
     p_rb.add_argument("--switch-depth", type=float, default=70.0)
     p_rb.add_argument("--stressed-rmv", type=float, default=1.00)
@@ -2872,6 +3166,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_rb.add_argument("--depth-units", choices=["feet", "meters"], default="feet")
     p_rb.add_argument("--volume-units", choices=["cuft", "liters"], default="cuft")
     p_rb.add_argument("--elevation-ft", type=float, default=0.0)
+    p_rb.add_argument("--profiles-file", type=str, help=prof_file_help)
 
     # 5. what-if
     p_wi = sub.add_parser("what-if", help="Variant 3C: Compare GF pairs and lost-deco-gas scenarios.")
@@ -2881,7 +3176,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_wi.add_argument("--f-he", type=float, default=0.45)
 
     # 6. repetitive
-    p_rep = sub.add_parser("repetitive", help="Variant 3D: Chain Dive 1 -> Surface Interval -> Dive 2, or compute standalone CNS % surface interval decay.")
+    p_rep = sub.add_parser("repetitive", help="Variant 3D: Chain Dive 1 -> Surface Interval -> Dive 2, or compute standalone CNS %% surface interval decay.")
     p_rep.add_argument("--d1-depth", type=float, default=130.0)
     p_rep.add_argument("--d1-time", type=float, default=25.0)
     p_rep.add_argument("--surface-interval", type=float, default=90.0)
@@ -2936,19 +3231,22 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_bl.add_argument("--topup-f-o2", type=float, default=0.21)
     p_bl.add_argument("--topup-f-he", type=float, default=0.0)
     p_bl.add_argument("--pressure-units", choices=["psi", "bar"], default="psi")
-    p_bl.add_argument("--cylinder", type=str, default="2xLP85")
+    p_bl.add_argument("--cylinder", type=str, default="2xLP85", help=cyl_help)
+    p_bl.add_argument("--profiles-file", type=str, help=prof_file_help)
 
     # 10. profiles (Manage UI Dropdown Profiles via CLI)
     p_prof = sub.add_parser("profiles", help="List, save, or delete saved dive profiles for the UI dropdown selector.")
     p_prof.add_argument("--action", choices=["list", "save", "delete"], default="list")
     p_prof.add_argument("--profile-id", type=str, help="Unique profile identifier (required for save and delete).")
     p_prof.add_argument("--title", type=str, help="Display title in the UI dropdown selector.")
-    p_prof.add_argument("--profiles-file", type=str, help="Optional custom JSON file path (default: assets/synthetic_dive_profiles.json).")
+    p_prof.add_argument("--profiles-file", type=str, help=prof_file_help)
     p_prof.add_argument("--mode", choices=["OC", "CCR"], default="OC")
     p_prof.add_argument("--depth", type=float, default=150.0)
     p_prof.add_argument("--time", type=float, default=25.0)
     p_prof.add_argument("--f-o2", type=float, default=0.21)
     p_prof.add_argument("--f-he", type=float, default=0.0)
+    p_prof.add_argument("--cylinder", type=str, default=None, help=f"Bottom gas cylinder preset ID. {cyl_help}")
+    p_prof.add_argument("--fill-psi", type=float, default=None, help="Starting bottom cylinder fill pressure in psi (defaults to cylinder rated working pressure).")
     p_prof.add_argument("--deco-gases", type=str, default="EAN50:0.50:0.0:70,O2 100%:1.00:0.0:20")
     p_prof.add_argument("--gf-low", type=float, default=30.0)
     p_prof.add_argument("--gf-high", type=float, default=85.0)
@@ -2973,11 +3271,46 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_prof.add_argument("--auto-best-gas", action="store_true", help="Automatically select optimal bottom and deco gases before saving.")
     p_prof.add_argument("--no-helium", action="store_true", help="Restrict --auto-best-gas bottom mix selection to Nitrox / Air only (0%% He).")
 
+    # 11. cylinders (Manage Custom Cylinder Types for CLI, Dive Planner, and Diver Tools)
+    p_cyl = sub.add_parser(
+        "cylinders",
+        help="List, save, or delete custom cylinder types for CLI commands, Dive Planner, and Diver Tools dropdowns.",
+        description=(
+            "Manage the cylinder catalog used across CLI subcommands and dashboard.html "
+            "(Dive Planner Gas Mixes and Diver Tools). Saving or deleting a custom cylinder in the default "
+            "store (assets/synthetic_dive_profiles.json) automatically rebuilds dashboard.html. "
+            "Provide either Imperial specs (--rated-cuft and --rated-psi) or Metric specs "
+            "(--water-liters and --rated-bar); the counterpart units are derived automatically for 1:1 "
+            "deliverable gas volume, or provide all four flags explicitly."
+        ),
+    )
+    p_cyl.add_argument("--action", choices=["list", "save", "delete"], default="list", help="Action: list all built-in and custom cylinders, save a custom cylinder, or delete a custom cylinder.")
+    p_cyl.add_argument("--cylinder-id", type=str, help="Unique cylinder preset ID (1-32 chars, e.g., HP130, AL30, D15_232; required for save/delete).")
+    p_cyl.add_argument("--name", type=str, help="Human-readable cylinder name (e.g., 'High Pressure Steel 130').")
+    p_cyl.add_argument("--rated-cuft", type=float, default=None, help="Imperial rated capacity in cuft (pair with --rated-psi; Metric water_liters auto-derived if omitted).")
+    p_cyl.add_argument("--rated-psi", type=float, default=None, help="Imperial rated working pressure in psi (100-6000; Metric rated_bar auto-derived if omitted).")
+    p_cyl.add_argument("--water-liters", type=float, default=None, help="Metric internal water volume in liters (pair with --rated-bar; Imperial rated_cuft auto-derived if omitted).")
+    p_cyl.add_argument("--rated-bar", type=float, default=None, help="Metric rated working pressure in bar (10-420; Imperial rated_psi auto-derived if omitted).")
+    p_cyl.add_argument("--profiles-file", type=str, help=prof_file_help)
+
     return parser
 
 
-def _build_dive_config_from_cli_args(args: argparse.Namespace) -> DiveConfig:
+def _build_dive_config_from_cli_args(
+    args: argparse.Namespace,
+    profiles_file: Optional[Path] = None,
+) -> DiveConfig:
     """Constructs a DiveConfig from CLI flags shared by 'plan' and 'profiles --action save'."""
+    catalog = get_cylinder_catalog(profiles_file)
+    bottom_cyl = getattr(args, "cylinder", None) or "2xLP85"
+    if bottom_cyl not in catalog:
+        raise DivePlannerValidationError(
+            "ERR_CYLINDER_ID",
+            f"Unknown cylinder preset '{bottom_cyl}'. Run 'cylinders --action list' to view available types or 'cylinders --action save' to add a custom cylinder.",
+        )
+    fill_psi_arg = getattr(args, "fill_psi", None)
+    bottom_fill_psi = float(fill_psi_arg) if fill_psi_arg is not None else float(catalog[bottom_cyl]["rated_psi"])
+
     deco_list: List[GasMix] = [
         GasMix(
             name=format_gas_name(args.f_o2, args.f_he),
@@ -2985,8 +3318,8 @@ def _build_dive_config_from_cli_args(args: argparse.Namespace) -> DiveConfig:
             f_he=args.f_he,
             role="bottom",
             max_po2=1.40,
-            cylinder_preset="2xLP85",
-            start_pressure_psi=2640.0,
+            cylinder_preset=bottom_cyl,
+            start_pressure_psi=bottom_fill_psi,
         )
     ]
     if args.deco_gases:
@@ -3057,10 +3390,30 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     cfg = config_from_dict(raw["config"])
                 else:
                     cfg = config_from_dict(raw)
-                res = plan_dive(cfg, auto_best_gas=args.auto_best_gas, allow_helium=(not args.no_helium))
+                res = plan_dive(
+                    cfg,
+                    auto_best_gas=args.auto_best_gas,
+                    allow_helium=(not args.no_helium),
+                    profiles_file=prof_store_path,
+                )
             else:
-                cfg = _build_dive_config_from_cli_args(args)
-                res = plan_dive(cfg, auto_best_gas=args.auto_best_gas, allow_helium=(not args.no_helium))
+                cfg = _build_dive_config_from_cli_args(args, profiles_file=prof_store_path)
+                res = plan_dive(
+                    cfg,
+                    auto_best_gas=args.auto_best_gas,
+                    allow_helium=(not args.no_helium),
+                    profiles_file=prof_store_path,
+                )
+                if args.auto_best_gas and args.cylinder:
+                    saved_auto = res.get("auto_selected_best_gas")
+                    catalog = get_cylinder_catalog(prof_store_path)
+                    chosen_fill = float(args.fill_psi) if args.fill_psi is not None else float(catalog[args.cylinder]["rated_psi"])
+                    target_list = cfg.oc_gases if cfg.dive_mode == "OC" else cfg.bailout_gases
+                    if target_list:
+                        target_list[0].cylinder_preset = args.cylinder
+                        target_list[0].start_pressure_psi = chosen_fill
+                        res = plan_dive(cfg, auto_best_gas=False, profiles_file=prof_store_path)
+                        res["auto_selected_best_gas"] = saved_auto
 
             if args.save_profile_id:
                 saved_meta = save_profile_to_store(
@@ -3091,8 +3444,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             if args.action == "save":
                 if not args.profile_id:
                     raise DivePlannerValidationError("ERR_PROFILE_ID", "--profile-id is required for 'profiles --action save'.")
-                cfg = _build_dive_config_from_cli_args(args)
-                res = plan_dive(cfg, auto_best_gas=args.auto_best_gas, allow_helium=(not args.no_helium))
+                cfg = _build_dive_config_from_cli_args(args, profiles_file=prof_store_path)
+                res = plan_dive(
+                    cfg,
+                    auto_best_gas=args.auto_best_gas,
+                    allow_helium=(not args.no_helium),
+                    profiles_file=prof_store_path,
+                )
+                if args.auto_best_gas and args.cylinder:
+                    saved_auto = res.get("auto_selected_best_gas")
+                    catalog = get_cylinder_catalog(prof_store_path)
+                    chosen_fill = float(args.fill_psi) if args.fill_psi is not None else float(catalog[args.cylinder]["rated_psi"])
+                    target_list = cfg.oc_gases if cfg.dive_mode == "OC" else cfg.bailout_gases
+                    if target_list:
+                        target_list[0].cylinder_preset = args.cylinder
+                        target_list[0].start_pressure_psi = chosen_fill
+                        res = plan_dive(cfg, auto_best_gas=False, profiles_file=prof_store_path)
+                        res["auto_selected_best_gas"] = saved_auto
                 out = save_profile_to_store(
                     profile_id=args.profile_id,
                     cfg_dict=res["config"],
@@ -3111,7 +3479,38 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 print(json.dumps(out, indent=2))
                 return 0
 
+        if args.subcommand == "cylinders":
+            prof_store_path = Path(args.profiles_file) if args.profiles_file else DEFAULT_PROFILES_PATH
+            if args.action == "list":
+                out = list_cylinders(prof_store_path)
+                print(json.dumps(out, indent=2))
+                return 0
+            if args.action == "save":
+                if not args.cylinder_id:
+                    raise DivePlannerValidationError("ERR_CYLINDER_ID", "--cylinder-id is required for 'cylinders --action save'.")
+                out = save_cylinder_to_store(
+                    cylinder_id=args.cylinder_id,
+                    name=args.name,
+                    rated_cuft=args.rated_cuft,
+                    rated_psi=args.rated_psi,
+                    water_liters=args.water_liters,
+                    rated_bar=args.rated_bar,
+                    profiles_file=prof_store_path,
+                )
+                print(json.dumps(out, indent=2))
+                return 0
+            if args.action == "delete":
+                if not args.cylinder_id:
+                    raise DivePlannerValidationError("ERR_CYLINDER_ID", "--cylinder-id is required for 'cylinders --action delete'.")
+                out = delete_cylinder_from_store(
+                    cylinder_id=args.cylinder_id,
+                    profiles_file=prof_store_path,
+                )
+                print(json.dumps(out, indent=2))
+                return 0
+
         if args.subcommand == "max-depth":
+            prof_store_path = Path(args.profiles_file) if args.profiles_file else DEFAULT_PROFILES_PATH
             out = solve_max_depth_envelope(
                 cylinder_preset=args.cylinder,
                 fill_pressure_psi=args.fill_psi,
@@ -3122,11 +3521,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 reserve_rule=args.reserve_rule,
                 depth_units=args.depth_units,
                 volume_units=args.volume_units,
+                profiles_file=prof_store_path,
             )
             print(json.dumps(out, indent=2))
             return 0
 
         if args.subcommand == "max-time":
+            prof_store_path = Path(args.profiles_file) if args.profiles_file else DEFAULT_PROFILES_PATH
             out = solve_max_time_at_depth(
                 depth=args.depth,
                 f_o2=args.f_o2,
@@ -3134,11 +3535,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 cylinder_preset=args.cylinder,
                 fill_pressure_psi=args.fill_psi,
                 depth_units=args.depth_units,
+                profiles_file=prof_store_path,
             )
             print(json.dumps(out, indent=2))
             return 0
 
         if args.subcommand == "rock-bottom":
+            prof_store_path = Path(args.profiles_file) if args.profiles_file else DEFAULT_PROFILES_PATH
             out = solve_rock_bottom(
                 depth=args.depth,
                 bottom_time_min=args.time,
@@ -3152,6 +3555,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 elevation_ft=args.elevation_ft,
                 depth_units=args.depth_units,
                 volume_units=args.volume_units,
+                profiles_file=prof_store_path,
             )
             print(json.dumps(out, indent=2))
             return 0
@@ -3247,6 +3651,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return 0
 
         if args.subcommand == "blend":
+            prof_store_path = Path(args.profiles_file) if args.profiles_file else DEFAULT_PROFILES_PATH
             out = calculate_gas_blender(
                 mode=args.mode,
                 start_pressure=args.start_pressure,
@@ -3259,6 +3664,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 topup_f_he=args.topup_f_he,
                 pressure_units=args.pressure_units,
                 cylinder_preset=args.cylinder,
+                profiles_file=prof_store_path,
             )
             print(json.dumps(out, indent=2))
             return 0

@@ -682,6 +682,294 @@ class TestSystemEndToEnd(unittest.TestCase):
         self.assertEqual(bm200_tx["endLabel"], "Target Max END")
         self.assertIn(f"<td><strong>{py_bm200_tx['best_mix_name']}</strong></td>", bm200_tx["html"])
 
+    def test_dashboard_custom_cylinder_manager_and_unified_dropdowns(self) -> None:
+        html = (PROJECT_ROOT / "dashboard.html").read_text(encoding="utf-8")
+        # 1. Verify accessible modal and triggers in both Dive Planner and Diver Tools
+        for token in [
+            'id="btn-manage-cylinders-planner"',
+            'id="btn-manage-cylinders-tools"',
+            'id="cylinder-manager-modal"',
+            'role="dialog"',
+            'aria-modal="true"',
+            'CUSTOM_CYLINDERS_STORAGE_KEY',
+            'function populateAllCylinderDropdowns(',
+            'function saveCustomCylinderFromModal(',
+            'function deleteBrowserCustomCylinder(',
+            'function applyImportedJsonPayload(',
+            'data-default-cylinder="AL80"',
+            'data-default-cylinder="2xLP85"',
+        ]:
+            self.assertIn(token, html, msg=f"Missing custom cylinder token in dashboard.html: {token}")
+
+        # Verify hardcoded incomplete <option> lists were removed from Diver Tools cylinder selects
+        for sel_id in ("u1-cylinder", "u3-cylinder", "u4-cylinder"):
+            self.assertIn(f'<select id="{sel_id}"', html)
+            sel_idx = html.index(f'<select id="{sel_id}"')
+            sel_end = html.index("</select>", sel_idx)
+            self.assertNotIn("<option", html[sel_idx:sel_end], msg=f"{sel_id} should be populated dynamically")
+
+        # 2. Execute inline <script> in Node.js VM to verify dynamic dropdown sync, CRUD, parity, and Export/Import
+        node_bin = shutil.which("node")
+        self.assertIsNotNone(node_bin, msg="Node.js is required for client-side dashboard verification.")
+        m = re.search(r"<script>(.*?)</script>", html, re.S)
+        self.assertIsNotNone(m)
+        script_src = m.group(1)
+
+        harness = (
+            """
+            const vm = require('vm');
+            function makeEl(extra = {}) {
+              return Object.assign({
+                value: '',
+                innerHTML: '',
+                textContent: '',
+                style: {},
+                attrs: {},
+                children: [],
+                classList: { toggle: () => {} },
+                setAttribute(k, v) { this.attrs[k] = String(v); },
+                getAttribute(k) { return this.attrs[k] !== undefined ? this.attrs[k] : null; },
+                removeAttribute(k) { delete this.attrs[k]; },
+                hasAttribute(k) { return Object.prototype.hasOwnProperty.call(this.attrs, k); },
+                appendChild(ch) { this.children.push(ch); },
+                focus() {},
+              }, extra);
+            }
+            const storage = {};
+            const elements = {
+              'u1-depth': makeEl({ value: '130' }),
+              'u1-fo2': makeEl({ value: '32' }),
+              'u1-fhe': makeEl({ value: '0' }),
+              'u1-cylinder': makeEl({ value: '', attrs: { 'data-default-cylinder': 'AL80' } }),
+              'u1-max-po2': makeEl({ value: '1.40' }),
+              'u1-max-end': makeEl({ value: '100' }),
+              'u1-results-box': makeEl(),
+              'u2-depth': makeEl({ value: '100' }),
+              'u2-po2': makeEl({ value: '1.40' }),
+              'u2-end': makeEl({ value: '100' }),
+              'u2-results-box': makeEl(),
+              'u3-cylinder': makeEl({ value: '', attrs: { 'data-default-cylinder': '2xLP85' } }),
+              'u3-start-psi': makeEl({ value: '0' }),
+              'u3-target-psi': makeEl({ value: '3442' }),
+              'u3-start-fo2': makeEl({ value: '21' }),
+              'u3-start-fhe': makeEl({ value: '0' }),
+              'u3-target-fo2': makeEl({ value: '32' }),
+              'u3-target-fhe': makeEl({ value: '0' }),
+              'u3-results-box': makeEl(),
+              'u4-depth': makeEl({ value: '150' }),
+              'u4-cylinder': makeEl({ value: '', attrs: { 'data-default-cylinder': '2xLP85' } }),
+              'u4-fill-pressure': makeEl({ value: '3442' }),
+              'u4-switch-depth': makeEl({ value: '70' }),
+              'u4-stressed-rmv': makeEl({ value: '1.00' }),
+              'u4-divers': makeEl({ value: '2' }),
+              'u4-problem-min': makeEl({ value: '1.0' }),
+              'u4-ascent-rate': makeEl({ value: '30' }),
+              'u4-results-box': makeEl(),
+              'u5-start-cns': makeEl({ value: '45' }),
+              'u4-si-min': makeEl({ value: '90' }),
+              'u5-results-box': makeEl(),
+              'gas-inventory-tbody': makeEl(),
+              'cylinder-manager-modal': makeEl({ attrs: { hidden: '' } }),
+              'cyl-modal-alert': makeEl(),
+              'cyl-input-id': makeEl({ value: '' }),
+              'cyl-input-name': makeEl({ value: '' }),
+              'cyl-unit-imperial': makeEl(),
+              'cyl-unit-metric': makeEl(),
+              'cyl-inputs-imperial': makeEl(),
+              'cyl-inputs-metric': makeEl(),
+              'cyl-input-cuft': makeEl({ value: '130' }),
+              'cyl-input-psi': makeEl({ value: '3442' }),
+              'cyl-input-liters': makeEl({ value: '15.0' }),
+              'cyl-input-bar': makeEl({ value: '232' }),
+              'cyl-conversion-preview': makeEl(),
+              'custom-cylinders-tbody': makeEl(),
+              'preset-select': makeEl(),
+              'input-profile-name': makeEl({ value: 'HP130 Test Plan' }),
+              'profile-save-status': makeEl(),
+              'input-depth': makeEl({ value: '150' }),
+              'input-time': makeEl({ value: '20' }),
+              'input-gf-low': makeEl({ value: '30' }),
+              'input-gf-high': makeEl({ value: '85' }),
+              'input-comp1': makeEl({ value: '1b' }),
+              'input-o2-narc': makeEl({ value: 'true' }),
+              'input-sp-bottom': makeEl({ value: '1.20' }),
+              'input-sp-deco': makeEl({ value: '1.30' }),
+              'input-sp-units': makeEl({ value: 'ATA' }),
+              'input-stop-size': makeEl({ value: '10' }),
+              'input-last-oc-stop': makeEl({ value: '10' }),
+              'input-last-ccr-stop': makeEl({ value: '10' }),
+              'input-min-stop-sec': makeEl({ value: '60' }),
+              'input-rmv-bottom': makeEl({ value: '0.75' }),
+              'input-rmv-deco': makeEl({ value: '0.60' }),
+              'input-rate-desc': makeEl({ value: '60' }),
+              'input-rate-asc': makeEl({ value: '30' }),
+              'input-rate-deco': makeEl({ value: '30' }),
+              'input-rate-surf': makeEl({ value: '10' }),
+              'input-elevation': makeEl({ value: '0' }),
+              'mode-btn-oc': makeEl(),
+              'mode-btn-ccr': makeEl(),
+              'unit-btn-feet': makeEl(),
+              'unit-btn-meters': makeEl(),
+              'bailout-view-toggle': makeEl(),
+            };
+            const sandbox = {
+              console,
+              Math,
+              Number,
+              String,
+              Boolean,
+              Array,
+              Object,
+              Set,
+              JSON,
+              RegExp,
+              Date,
+              setTimeout: () => {},
+              localStorage: {
+                getItem: k => (Object.prototype.hasOwnProperty.call(storage, k) ? storage[k] : null),
+                setItem: (k, v) => { storage[k] = String(v); },
+                removeItem: k => { delete storage[k]; },
+              },
+              window: {
+                addEventListener: () => {},
+                matchMedia: () => ({ matches: false, addEventListener: () => {} }),
+              },
+              document: {
+                documentElement: { setAttribute: () => {} },
+                getElementById: id => elements[id] || null,
+                querySelectorAll: () => [],
+                addEventListener: () => {},
+                createElement: () => makeEl(),
+              },
+            };
+            vm.createContext(sandbox);
+            vm.runInContext("""
+            + json.dumps(script_src)
+            + """, sandbox);
+            // Stub heavy chart/table renderers not needed for cylinder logic verification
+            sandbox.recomputeDashboard = () => {};
+            sandbox.loadBenchmarkPreset = () => {};
+
+            // 1. Initial populate should expose all 14 built-in cylinders in u1, u3, u4, and Dive Planner
+            sandbox.populateAllCylinderDropdowns();
+            const initU1Count = (elements['u1-cylinder'].innerHTML.match(/<option /g) || []).length;
+            const initU3Count = (elements['u3-cylinder'].innerHTML.match(/<option /g) || []).length;
+            const initU4Count = (elements['u4-cylinder'].innerHTML.match(/<option /g) || []).length;
+            const initPlannerHtml = elements['gas-inventory-tbody'].children.map(c => c.innerHTML).join('');
+
+            // 2. Reject invalid / XSS ID and built-in collision
+            elements['cyl-input-id'].value = '<script>x</script>';
+            elements['cyl-input-name'].value = 'Bad';
+            const badIdOk = sandbox.saveCustomCylinderFromModal();
+
+            elements['cyl-input-id'].value = 'AL80';
+            elements['cyl-input-name'].value = 'Overwrite Builtin';
+            const builtinCollisionOk = sandbox.saveCustomCylinderFromModal();
+
+            // 3. Save custom Imperial cylinder HP130 (130 cuft @ 3442 psi)
+            sandbox.setCylinderModalUnitMode('imperial');
+            elements['cyl-input-id'].value = 'HP130';
+            elements['cyl-input-name'].value = 'High Pressure Steel 130';
+            elements['cyl-input-cuft'].value = '130';
+            elements['cyl-input-psi'].value = '3442';
+            const savedHp130 = sandbox.saveCustomCylinderFromModal();
+            const hp130Spec = sandbox.getCylinderSpec('HP130');
+            const plannerAfterSave = elements['gas-inventory-tbody'].children.map(c => c.innerHTML).join('');
+            const u1AfterSave = elements['u1-cylinder'].innerHTML;
+            const u3AfterSave = elements['u3-cylinder'].innerHTML;
+            const u4AfterSave = elements['u4-cylinder'].innerHTML;
+
+            // 4. Run Gas Blender and Rock Bottom with custom HP130
+            elements['u3-cylinder'].value = 'HP130';
+            sandbox.runUtilityBlender();
+            const u3BlendHtml = elements['u3-results-box'].innerHTML;
+
+            elements['u4-cylinder'].value = 'HP130';
+            elements['u4-fill-pressure'].value = '3442';
+            sandbox.runUtilityDensityAndRockBottom();
+            const u4RbHtml = elements['u4-results-box'].innerHTML;
+
+            // 5. Export -> Clear Local Data -> Import round-trip
+            const exported = sandbox.buildExportPayload();
+            sandbox.clearAllLocalData();
+            const afterClearHasHp130 = Object.prototype.hasOwnProperty.call(sandbox.getAllCylinders(), 'HP130');
+            const importSummary = sandbox.applyImportedJsonPayload(exported);
+            const afterImportHasHp130 = Object.prototype.hasOwnProperty.call(sandbox.getAllCylinders(), 'HP130');
+
+            // 6. Delete custom cylinder cleanly
+            const deletedHp130 = sandbox.deleteBrowserCustomCylinder('HP130');
+            const afterDeleteHasHp130 = Object.prototype.hasOwnProperty.call(sandbox.getAllCylinders(), 'HP130');
+
+            console.log(JSON.stringify({
+              initU1Count,
+              initU3Count,
+              initU4Count,
+              initPlannerHasD12: initPlannerHtml.includes('value="D12_232"'),
+              badIdOk,
+              builtinCollisionOk,
+              savedHp130,
+              hp130Spec,
+              inPlanner: plannerAfterSave.includes('value="HP130"'),
+              inU1: u1AfterSave.includes('value="HP130"'),
+              inU3: u3AfterSave.includes('value="HP130"'),
+              inU4: u4AfterSave.includes('value="HP130"'),
+              u3BlendHtml,
+              u4RbHtml,
+              exportedHasHp130: Boolean(exported.custom_cylinders && exported.custom_cylinders.HP130),
+              afterClearHasHp130,
+              importSummary,
+              afterImportHasHp130,
+              deletedHp130,
+              afterDeleteHasHp130,
+            }));
+            """
+        )
+
+        proc = subprocess.run(
+            [node_bin],
+            input=harness,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(proc.returncode, 0, msg=f"Node execution failed: {proc.stderr}")
+        out = json.loads(proc.stdout.strip())
+
+        # All 4 selectors dynamically expose all 14 built-in presets
+        self.assertEqual(out["initU1Count"], 14)
+        self.assertEqual(out["initU3Count"], 14)
+        self.assertEqual(out["initU4Count"], 14)
+        self.assertTrue(out["initPlannerHasD12"])
+
+        # Validation & built-in protection
+        self.assertFalse(out["badIdOk"])
+        self.assertFalse(out["builtinCollisionOk"])
+        self.assertTrue(out["savedHp130"])
+
+        # Exact JS <-> Python Virial Z-factor conversion parity for HP130
+        py_spec = p.build_cylinder_spec(name="High Pressure Steel 130", rated_cuft=130.0, rated_psi=3442.0)
+        self.assertEqual(out["hp130Spec"]["rated_cuft"], py_spec["rated_cuft"])
+        self.assertEqual(out["hp130Spec"]["rated_psi"], py_spec["rated_psi"])
+        self.assertEqual(out["hp130Spec"]["rated_bar"], py_spec["rated_bar"])
+        self.assertAlmostEqual(out["hp130Spec"]["water_liters"], py_spec["water_liters"], delta=0.02)
+
+        # Custom HP130 appears in Dive Planner AND all 3 Diver Tools dropdowns
+        self.assertTrue(out["inPlanner"])
+        self.assertTrue(out["inU1"])
+        self.assertTrue(out["inU3"])
+        self.assertTrue(out["inU4"])
+        self.assertIn("130.0 cuft", out["u3BlendHtml"])
+        self.assertIn("Deliverable Capacity (HP130)", out["u3BlendHtml"])
+        self.assertIn("HP130", out["u4RbHtml"])
+
+        # Export -> Clear Local Data -> Import -> Delete lifecycle
+        self.assertTrue(out["exportedHasHp130"])
+        self.assertFalse(out["afterClearHasHp130"])
+        self.assertEqual(out["importSummary"]["importedCylinders"], 1)
+        self.assertTrue(out["afterImportHasHp130"])
+        self.assertTrue(out["deletedHp130"])
+        self.assertFalse(out["afterDeleteHasHp130"])
+
 
 if __name__ == "__main__":
     unittest.main()

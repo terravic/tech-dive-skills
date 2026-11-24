@@ -6,6 +6,7 @@ from __future__ import annotations
 import math
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -267,6 +268,74 @@ class TestZhl16cMathematics(unittest.TestCase):
         self.assertEqual(rb_insuff["turn_governing_rule"], "INSUFFICIENT_CYLINDER")
         self.assertEqual(rb_insuff["usable_before_turn_psi"], 0.0)
         self.assertTrue(any("INSUFFICIENT_CYLINDER_CAPACITY" in w for w in rb_insuff["warnings"]))
+
+    def test_custom_cylinder_crud_and_physics_parity(self) -> None:
+        # 1. Imperial auto-derivation (HP130: 130 cuft @ 3442 psi -> 15.72 L @ 237.3 bar, exact 1:1 volume)
+        imp = p.build_cylinder_spec(name="High Pressure Steel 130", rated_cuft=130.0, rated_psi=3442.0)
+        self.assertEqual(imp["rated_cuft"], 130.0)
+        self.assertEqual(imp["rated_psi"], 3442.0)
+        self.assertAlmostEqual(imp["rated_bar"], 237.3, delta=0.2)
+        self.assertAlmostEqual(imp["water_liters"], 15.72, delta=0.05)
+
+        # 2. Metric auto-derivation (D15_232: 30 L @ 232 bar -> 242.6 cuft @ 3364.9 psi, exact 1:1 volume)
+        met = p.build_cylinder_spec(name="Twin 2x15L Euro Doubles", water_liters=30.0, rated_bar=232.0)
+        self.assertEqual(met["water_liters"], 30.0)
+        self.assertEqual(met["rated_bar"], 232.0)
+        self.assertAlmostEqual(met["rated_psi"], 3364.9, delta=0.5)
+        self.assertAlmostEqual(met["rated_cuft"], 242.6, delta=0.2)
+
+        # 3. Validation errors for invalid ID, built-in collision, and out-of-range specs
+        for bad_id in ("", "bad id", "../etc", "__proto__", "<script>"):
+            with self.assertRaises(p.DivePlannerValidationError) as ctx:
+                p.validate_cylinder_id(bad_id)
+            self.assertEqual(ctx.exception.code, "ERR_CYLINDER_ID")
+
+        with self.assertRaises(p.DivePlannerValidationError) as ctx:
+            p.build_cylinder_spec(name="Bad", rated_cuft=100.0)  # missing working pressure
+        self.assertEqual(ctx.exception.code, "ERR_CYLINDER_SPEC")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = Path(tmpdir) / "cyl_store.json"
+            with self.assertRaises(p.DivePlannerValidationError) as ctx:
+                p.save_cylinder_to_store("AL80", name="Overwrite", rated_cuft=80.0, rated_psi=3000.0, profiles_file=store, rebuild_dashboard=False)
+            self.assertEqual(ctx.exception.code, "ERR_CYLINDER_BUILTIN")
+
+            # 4. Save, list, calculate capacity / blend / rock-bottom / plan, and delete
+            saved = p.save_cylinder_to_store(
+                "HP130", name="High Pressure Steel 130", rated_cuft=130.0, rated_psi=3442.0,
+                profiles_file=store, rebuild_dashboard=False,
+            )
+            self.assertEqual(saved["action"], "created")
+            self.assertEqual(saved["custom_count"], 1)
+
+            listed = p.list_cylinders(profiles_file=store)
+            self.assertEqual(listed["builtin_count"], 14)
+            self.assertEqual(listed["custom_count"], 1)
+
+            cap = p.calculate_cylinder_fill_capacity("HP130", 3442.0, "psi", 0.32, 0.0, profiles_file=store)
+            self.assertEqual(cap["ideal_volume_cuft"], 130.0)
+            self.assertEqual(cap["cylinder_name"], "High Pressure Steel 130")
+
+            rb = p.solve_rock_bottom(
+                depth=150.0, bottom_time_min=20.0, cylinder_preset="HP130",
+                fill_pressure_psi=3442.0, profiles_file=store,
+            )
+            self.assertEqual(rb["cylinder_preset"], "HP130")
+
+            cfg = p.DiveConfig(
+                segments=[{"depth": 150.0, "time_min": 20.0}],
+                oc_gases=[p.GasMix(name="Tx 21/35", f_o2=0.21, f_he=0.35, role="bottom", cylinder_preset="HP130", start_pressure_psi=3442.0)],
+            )
+            plan_res = p.plan_dive(cfg, profiles_file=store)
+            self.assertEqual(plan_res["primary_plan"]["cylinder_logistics"][0]["cylinder_preset"], "HP130")
+            self.assertEqual(plan_res["primary_plan"]["cylinder_logistics"][0]["volume_available"], 130.0)
+
+            deleted = p.delete_cylinder_from_store("HP130", profiles_file=store, rebuild_dashboard=False)
+            self.assertEqual(deleted["custom_count"], 0)
+
+            with self.assertRaises(p.DivePlannerValidationError) as ctx:
+                p.calculate_cylinder_fill_capacity("HP130", 3442.0, "psi", profiles_file=store)
+            self.assertEqual(ctx.exception.code, "ERR_CYLINDER_ID")
 
 
 if __name__ == "__main__":
